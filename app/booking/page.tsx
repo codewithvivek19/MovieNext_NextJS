@@ -222,7 +222,6 @@ export default function BookingPage() {
                           onClick={() => handleSeatClick(seat)}
                           disabled={seat.status === "booked"}
                           aria-label={`Seat ${seat.id} ${seat.status}`}
-                          aria-pressed={seat.status === "selected" ? "true" : "false"}
                         >
                           {seat.number}
                         </button>
