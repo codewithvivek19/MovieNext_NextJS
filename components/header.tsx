@@ -12,9 +12,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/movies", label: "Movies" },
-  { href: "/upcoming", label: "Coming Soon" },
   { href: "/theaters", label: "Theaters" },
-  { href: "/offers", label: "Offers" },
+  { href: "/my-bookings", label: "My Bookings" },
 ]
 
 export default function Header() {

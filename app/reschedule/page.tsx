@@ -3,23 +3,14 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { Calendar, Clock, MapPin, Film, ArrowRight, AlertCircle } from "lucide-react"
+import { Calendar, Clock, MapPin, ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { getTheaterById, showtimes } from "@/lib/data"
 
 export default function ReschedulePage() {
   const router = useRouter()
@@ -27,110 +18,180 @@ export default function ReschedulePage() {
   const bookingId = searchParams.get("id")
 
   const [booking, setBooking] = useState<any>(null)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [selectedTheater, setSelectedTheater] = useState<number | null>(null)
-  const [selectedShowtime, setSelectedShowtime] = useState<number | null>(null)
-  const [openDialog, setOpenDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [availableShowtimes, setAvailableShowtimes] = useState<any[]>([])
+  const [selectedShowtime, setSelectedShowtime] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<boolean>(false)
 
+  // Get booking details from localStorage
   useEffect(() => {
     if (!bookingId) {
-      router.push("/my-bookings")
+      setError("No booking ID provided")
+      setIsLoading(false)
       return
     }
 
-    // Get booking details from localStorage
-    const bookings = JSON.parse(localStorage.getItem("bookings") || "[]")
-    const foundBooking = bookings.find((b: any) => b.id === bookingId)
+    const storedBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
+    const bookingToReschedule = storedBookings.find((b: any) => b.id === bookingId)
 
-    if (foundBooking && foundBooking.status !== "cancelled") {
-      setBooking(foundBooking)
-      setSelectedDate(foundBooking.date)
-      setSelectedTheater(foundBooking.theater.id)
-    } else {
-      router.push("/my-bookings")
-    }
-  }, [bookingId, router])
-
-  // Generate dates for the next 14 days
-  const generateDates = () => {
-    const dates = []
-    const today = new Date()
-
-    for (let i = 0; i < 14; i++) {
-      const date = new Date()
-      date.setDate(today.getDate() + i)
-      dates.push(date.toISOString().split("T")[0])
+    if (!bookingToReschedule) {
+      setError("Booking not found")
+      setIsLoading(false)
+      return
     }
 
-    return dates
-  }
+    setBooking(bookingToReschedule)
+    
+    // Set initial date to the booking date
+    const initialDate = new Date(bookingToReschedule.date)
+    setSelectedDate(initialDate)
+    
+    setIsLoading(false)
+  }, [bookingId])
 
-  const availableDates = generateDates()
-
-  function formatDate(dateString: string) {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-  }
+  // Generate random showtimes when date changes
+  useEffect(() => {
+    if (!selectedDate) return
+    
+    // Generate 4-6 random showtimes for the selected date
+    const count = Math.floor(Math.random() * 3) + 4
+    const times = []
+    
+    // Common movie showtimes
+    const baseShowtimes = ["10:00 AM", "12:30 PM", "3:00 PM", "5:30 PM", "8:00 PM", "10:30 PM"]
+    
+    for (let i = 0; i < count; i++) {
+      const time = baseShowtimes[i]
+      times.push({ id: `st-${Date.now()}-${i}`, time })
+    }
+    
+    setAvailableShowtimes(times)
+  }, [selectedDate])
 
   const handleReschedule = () => {
-    if (!selectedDate || !selectedTheater || !selectedShowtime) return
+    if (!selectedDate || !selectedShowtime || !booking) {
+      setError("Please select a date and showtime")
+      return
+    }
 
-    const updatedShowtime = showtimes.find((st) => st.id === selectedShowtime)
-    const updatedTheater = getTheaterById(selectedTheater)
+    // Format date to YYYY-MM-DD
+    const formattedDate = selectedDate.toISOString().split("T")[0]
+    
+    // Find the selected showtime object
+    const showtime = availableShowtimes.find(st => st.time === selectedShowtime)
+    
+    if (!showtime) {
+      setError("Invalid showtime selected")
+      return
+    }
 
-    if (!updatedShowtime || !updatedTheater) return
-
-    setOpenDialog(true)
-  }
-
-  const confirmReschedule = () => {
-    if (!booking || !selectedDate || !selectedTheater || !selectedShowtime) return
-
-    const bookings = JSON.parse(localStorage.getItem("bookings") || "[]")
-    const updatedShowtime = showtimes.find((st) => st.id === selectedShowtime)
-    const updatedTheater = getTheaterById(selectedTheater)
-
-    if (!updatedShowtime || !updatedTheater) return
-
-    const updatedBookings = bookings.map((b: any) => {
-      if (b.id === booking.id) {
+    // Update booking in localStorage
+    const storedBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
+    const updatedBookings = storedBookings.map((b: any) => {
+      if (b.id === bookingId) {
         return {
           ...b,
-          date: selectedDate,
-          theater: updatedTheater,
-          showtime: updatedShowtime,
+          date: formattedDate,
+          showtime: { ...b.showtime, time: selectedShowtime }
         }
       }
       return b
     })
 
     localStorage.setItem("bookings", JSON.stringify(updatedBookings))
-    router.push(`/booking-confirmation?id=${booking.id}`)
+    
+    // Show success message and redirect after a delay
+    setSuccess(true)
+    setTimeout(() => {
+      router.push("/my-bookings")
+    }, 2000)
+  }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric"
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/4 mx-auto mb-4"></div>
+          <div className="h-64 bg-muted rounded max-w-md mx-auto"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive" className="max-w-md mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <div className="text-center mt-6">
+          <Button variant="outline" onClick={() => router.push("/my-bookings")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to My Bookings
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (!booking) {
-    return <div className="container mx-auto px-4 py-8 text-center">Loading...</div>
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <p>Booking not found</p>
+        <Button variant="outline" onClick={() => router.push("/my-bookings")} className="mt-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to My Bookings
+        </Button>
+      </div>
+    )
   }
 
-  const isDateChanged = selectedDate !== booking.date
-  const isTheaterChanged = selectedTheater !== booking.theater.id
-  const isShowtimeChanged = selectedShowtime !== booking.showtime.id
-  const hasChanges = isDateChanged || isTheaterChanged || isShowtimeChanged
+  if (success) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert className="max-w-md mx-auto bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <AlertTitle>Success!</AlertTitle>
+          <AlertDescription>Your booking has been rescheduled successfully</AlertDescription>
+        </Alert>
+        <div className="text-center mt-6">
+          <p className="text-sm text-muted-foreground mb-4">Redirecting to My Bookings...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Reschedule Booking</h1>
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center gap-2 mb-6">
+          <Button variant="outline" size="icon" onClick={() => router.push("/my-bookings")}>
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <h1 className="text-3xl font-bold">Reschedule Booking</h1>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
             <CardHeader>
               <CardTitle>Current Booking</CardTitle>
-              <CardDescription>Booking ID: {booking.id}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex gap-4 mb-4">
-                <div className="relative w-16 h-24 overflow-hidden rounded">
+                <div className="relative w-20 h-28 overflow-hidden rounded">
                   <Image
                     src={booking.movie.poster || "/placeholder.svg"}
                     alt={booking.movie.title}
@@ -140,289 +201,103 @@ export default function ReschedulePage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">{booking.movie.title}</h3>
-                  <div className="flex items-center text-muted-foreground text-sm mt-1">
-                    <Film size={14} className="mr-1" />
-                    <span>{booking.movie.language}</span>
-                  </div>
-                  <div className="flex items-center text-muted-foreground text-sm mt-1">
-                    <Clock size={14} className="mr-1" />
-                    <span>{booking.movie.duration} min</span>
+                  <div className="space-y-1 mt-1">
+                    <div className="flex items-center">
+                      <Calendar size={14} className="mr-2 text-muted-foreground" />
+                      <span>{new Date(booking.date).toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric"
+                      })}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Clock size={14} className="mr-2 text-muted-foreground" />
+                      <span>{booking.showtime.time}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin size={14} className="mr-2 text-muted-foreground" />
+                      <span>{booking.theater.name}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-muted rounded-lg p-3">
-                  <div className="text-sm text-muted-foreground mb-1">Date</div>
-                  <div className="flex items-center">
-                    <Calendar size={16} className="mr-2" />
-                    <span>{formatDate(booking.date)}</span>
-                  </div>
-                </div>
-                <div className="bg-muted rounded-lg p-3">
-                  <div className="text-sm text-muted-foreground mb-1">Time</div>
-                  <div className="flex items-center">
-                    <Clock size={16} className="mr-2" />
-                    <span>{booking.showtime.time}</span>
-                  </div>
-                </div>
-                <div className="bg-muted rounded-lg p-3">
-                  <div className="text-sm text-muted-foreground mb-1">Theater</div>
-                  <div className="flex items-center">
-                    <MapPin size={16} className="mr-2" />
-                    <span>{booking.theater.name}</span>
-                  </div>
-                </div>
+              <Separator className="my-4" />
+
+              <div>
+                <span className="text-sm text-muted-foreground">Seats:</span>
+                <span className="ml-2 text-sm">{booking.seats.map((s: any) => s.id).join(", ")}</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Select New Schedule</CardTitle>
-              <CardDescription>Choose a new date, theater, or showtime</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Select Date</h3>
-
-                <div className="flex overflow-x-auto gap-3 pb-2">
-                  {availableDates.map((date) => (
-                    <Button
-                      key={date}
-                      variant={selectedDate === date ? "default" : "outline"}
-                      onClick={() => setSelectedDate(date)}
-                      className="min-w-[120px]"
-                    >
-                      {formatDate(date)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Select Theater</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    {
-                      id: 1,
-                      name: "Cineplex Downtown",
-                      location: "123 Main St, Downtown",
-                      rating: 4.5,
-                    },
-                    {
-                      id: 2,
-                      name: "Silver Screen Multiplex",
-                      location: "456 Oak Ave, Westside",
-                      rating: 4.2,
-                    },
-                    {
-                      id: 3,
-                      name: "Nova Cinema City",
-                      location: "789 Pine Blvd, Eastside",
-                      rating: 4.7,
-                    },
-                    {
-                      id: 4,
-                      name: "Grand Theater IMAX",
-                      location: "101 Maple Dr, Northside",
-                      rating: 4.8,
-                    },
-                  ].map((theater) => (
-                    <Card
-                      key={theater.id}
-                      className={`cursor-pointer ${selectedTheater === theater.id ? "border-primary" : ""}`}
-                      onClick={() => setSelectedTheater(theater.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div>
-                          <h4 className="font-semibold">{theater.name}</h4>
-                          <p className="text-sm text-muted-foreground">{theater.location}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {selectedTheater && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Select Showtime</h3>
-
-                  <Tabs defaultValue="standard">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="standard">Standard</TabsTrigger>
-                      <TabsTrigger value="imax">IMAX</TabsTrigger>
-                      <TabsTrigger value="vip">VIP</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="standard">
-                      <div className="flex flex-wrap gap-3">
-                        {showtimes
-                          .filter((st) => st.theaterId === selectedTheater && st.format === "standard")
-                          .map((st) => (
-                            <Button
-                              key={st.id}
-                              variant={selectedShowtime === st.id ? "default" : "outline"}
-                              onClick={() => setSelectedShowtime(st.id)}
-                            >
-                              {st.time}
-                            </Button>
-                          ))}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="imax">
-                      <div className="flex flex-wrap gap-3">
-                        {showtimes
-                          .filter((st) => st.theaterId === selectedTheater && st.format === "imax")
-                          .map((st) => (
-                            <Button
-                              key={st.id}
-                              variant={selectedShowtime === st.id ? "default" : "outline"}
-                              onClick={() => setSelectedShowtime(st.id)}
-                            >
-                              {st.time}
-                            </Button>
-                          ))}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="vip">
-                      <div className="flex flex-wrap gap-3">
-                        {showtimes
-                          .filter((st) => st.theaterId === selectedTheater && st.format === "vip")
-                          .map((st) => (
-                            <Button
-                              key={st.id}
-                              variant={selectedShowtime === st.id ? "default" : "outline"}
-                              onClick={() => setSelectedShowtime(st.id)}
-                            >
-                              {st.time}
-                            </Button>
-                          ))}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => router.push("/my-bookings")}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleReschedule}
-                disabled={!selectedDate || !selectedTheater || !selectedShowtime || !hasChanges}
-              >
-                Reschedule
-                <ArrowRight size={16} className="ml-2" />
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Changes Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!hasChanges ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>No changes selected</AlertTitle>
-                  <AlertDescription>
-                    Select a new date, theater, or showtime to reschedule your booking.
-                  </AlertDescription>
-                </Alert>
-              ) : (
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Select New Date & Time</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
-                  {isDateChanged && (
-                    <div>
-                      <h4 className="text-sm font-medium">Date</h4>
-                      <div className="flex items-center gap-4 mt-1">
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">From</div>
-                          <div>{formatDate(booking.date)}</div>
-                        </div>
-                        <ArrowRight size={16} />
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">To</div>
-                          <div>{selectedDate ? formatDate(selectedDate) : ""}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {isTheaterChanged && (
-                    <div>
-                      <h4 className="text-sm font-medium">Theater</h4>
-                      <div className="flex items-center gap-4 mt-1">
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">From</div>
-                          <div>{booking.theater.name}</div>
-                        </div>
-                        <ArrowRight size={16} />
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">To</div>
-                          <div>{selectedTheater ? getTheaterById(selectedTheater)?.name : ""}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {isShowtimeChanged && (
-                    <div>
-                      <h4 className="text-sm font-medium">Showtime</h4>
-                      <div className="flex items-center gap-4 mt-1">
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">From</div>
-                          <div>{booking.showtime.time}</div>
-                        </div>
-                        <ArrowRight size={16} />
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">To</div>
-                          <div>{selectedShowtime ? showtimes.find((st) => st.id === selectedShowtime)?.time : ""}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
                   <div>
-                    <h4 className="text-sm font-medium">Important Information</h4>
-                    <ul className="mt-2 text-sm text-muted-foreground space-y-1">
-                      <li>• Your seat selection will remain the same</li>
-                      <li>• No additional fees for rescheduling</li>
-                      <li>• Reschedule is allowed only once per booking</li>
-                      <li>• Original ticket will be invalidated</li>
-                    </ul>
+                    <div className="mb-2 font-medium">Select Date</div>
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      disabled={(date) => {
+                        // Disable dates in the past and more than 2 weeks in the future
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const maxDate = new Date()
+                        maxDate.setDate(maxDate.getDate() + 14)
+                        return date < today || date > maxDate
+                      }}
+                      className="border rounded-md"
+                    />
                   </div>
+
+                  {selectedDate && (
+                    <div>
+                      <div className="mb-2 font-medium">Select Time</div>
+                      <div className="bg-muted/50 rounded-md p-4">
+                        <div className="text-sm mb-3">{formatDate(selectedDate)}</div>
+                        <RadioGroup value={selectedShowtime || ""} onValueChange={setSelectedShowtime}>
+                          <div className="flex flex-wrap gap-2">
+                            {availableShowtimes.map((st) => (
+                              <div key={st.id} className="flex items-center space-x-2">
+                                <RadioGroupItem value={st.time} id={st.id} className="peer sr-only" />
+                                <Label
+                                  htmlFor={st.id}
+                                  className="px-3 py-2 rounded-md border bg-background peer-data-[state=checked]:bg-primary peer-data-[state=checked]:text-primary-foreground hover:bg-muted cursor-pointer"
+                                >
+                                  {st.time}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  onClick={handleReschedule}
+                  disabled={!selectedDate || !selectedShowtime}
+                  className="w-full"
+                >
+                  Confirm Reschedule
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <div className="mt-4 text-sm text-muted-foreground">
+              <p>Note: Your seat selection will remain the same. Rescheduling is subject to availability.</p>
+            </div>
+          </div>
         </div>
       </div>
-
-      <AlertDialog open={openDialog} onOpenChange={setOpenDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Reschedule</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to reschedule this booking? Your original ticket will be invalidated and a new one
-              will be issued.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReschedule}>Yes, reschedule</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
