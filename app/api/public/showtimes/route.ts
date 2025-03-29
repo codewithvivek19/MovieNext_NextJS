@@ -59,8 +59,9 @@ export async function GET(req: NextRequest) {
     });
     
     // If no showtimes found for the specified filters, generate default showtimes
-    if (showtimes.length === 0 && movieId && date) {
-      // Create default showtimes for this movie and date
+    if ((showtimes.length === 0 && movieId && date) || 
+        (showtimes.length === 0 && date)) {
+      // Create default showtimes for this date
       const defaultShowtimes = [];
       
       // Common movie showtimes
@@ -72,52 +73,100 @@ export async function GET(req: NextRequest) {
       
       // Get theaters to create showtimes for
       const theaters = await prisma.theater.findMany({
-        take: 3, // Limit to 3 theaters
         orderBy: {
           id: 'asc'
         }
       });
       
-      // Get movie information
-      const movie = await prisma.movie.findUnique({
-        where: {
-          id: parseInt(movieId)
-        },
-        select: {
-          id: true,
-          title: true,
-          poster: true
+      // Get movie information if movieId is provided
+      let movie = null;
+      if (movieId) {
+        movie = await prisma.movie.findUnique({
+          where: {
+            id: parseInt(movieId)
+          },
+          select: {
+            id: true,
+            title: true,
+            poster: true
+          }
+        });
+      } else {
+        // If no movie ID, get all movies to create diverse showtimes
+        const movies = await prisma.movie.findMany({
+          select: {
+            id: true,
+            title: true,
+            poster: true
+          }
+        });
+        
+        // If movies exist, pick the first one or a random one
+        if (movies.length > 0) {
+          movie = movies[0]; // Default to first movie
         }
-      });
+      }
       
-      if (movie && theaters.length > 0) {
+      if ((movie || !movieId) && theaters.length > 0) {
         const queryDate = new Date(date);
         
-        // Generate 4 random times for each theater
+        // For each theater, generate showtimes
         for (const theater of theaters) {
-          const times = [];
-          // Pick 4 random times from the default times
-          for (let i = 0; i < 4; i++) {
-            const randomIndex = Math.floor(Math.random() * defaultTimes.length);
-            if (!times.includes(defaultTimes[randomIndex])) {
-              times.push(defaultTimes[randomIndex]);
+          // If no specific movie was requested, generate showtimes for all movies
+          const moviesToUse = !movieId ? await prisma.movie.findMany({
+            select: {
+              id: true,
+              title: true,
+              poster: true
             }
-          }
+          }) : [movie];
           
-          // Sort times
-          times.sort();
-          
-          // Create showtime objects
-          for (const time of times) {
-            defaultShowtimes.push({
-              id: Math.floor(Math.random() * 10000) + 1000, // Fake ID
-              date: queryDate.toISOString().split('T')[0],
-              time: time,
-              movieId: movie.id,
-              theaterId: theater.id,
-              movie: movie,
-              theater: theater
-            });
+          for (const movieToUse of moviesToUse) {
+            if (!movieToUse) continue;
+            
+            const times = [];
+            // Pick 4-6 times for this movie and theater
+            const numTimes = Math.floor(Math.random() * 3) + 4; // 4-6 times
+            
+            for (let i = 0; i < numTimes; i++) {
+              const randomIndex = Math.floor(Math.random() * defaultTimes.length);
+              if (!times.includes(defaultTimes[randomIndex])) {
+                times.push(defaultTimes[randomIndex]);
+              }
+            }
+            
+            // Sort times
+            times.sort();
+            
+            // Create showtime objects with appropriate pricing
+            for (const time of times) {
+              // Random price between 150 and 350
+              const price = Math.floor(Math.random() * 200) + 150;
+              
+              // Determine format based on time of day
+              let format = 'standard';
+              const hour = parseInt(time.split(':')[0]);
+              const isPM = time.includes('PM');
+              
+              if (isPM && hour >= 7) {
+                format = 'premium';
+              } else if (isPM && hour >= 2 && hour < 7) {
+                format = 'imax';
+              }
+              
+              defaultShowtimes.push({
+                id: Math.floor(Math.random() * 10000) + 1000, // Fake ID
+                date: queryDate.toISOString().split('T')[0],
+                time: time,
+                movieId: movieToUse.id,
+                theaterId: theater.id,
+                price: price,
+                format: format,
+                available_seats: theater.seating_capacity || 100,
+                movie: movieToUse,
+                theater: theater
+              });
+            }
           }
         }
       }

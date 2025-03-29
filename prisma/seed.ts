@@ -163,14 +163,17 @@ async function main() {
   console.log('Creating showtimes...');
   
   const currentDate = new Date();
+  
+  // Define show formats with times and price ranges
   const formats = [
-    { name: 'standard', times: ['10:00 AM', '4:00 PM'], priceRange: [200, 250] },
-    { name: 'imax', times: ['1:00 PM'], priceRange: [300, 350] },
-    { name: 'vip', times: ['7:00 PM'], priceRange: [450, 500] },
+    { name: 'standard', times: ['10:00 AM', '2:00 PM', '4:30 PM'], priceRange: [200, 250] },
+    { name: 'imax', times: ['11:30 AM', '3:30 PM', '6:00 PM'], priceRange: [300, 350] },
+    { name: 'premium', times: ['1:00 PM', '5:30 PM', '8:30 PM'], priceRange: [350, 400] },
+    { name: 'vip', times: ['7:00 PM', '9:30 PM'], priceRange: [450, 500] },
   ];
 
-  // Generate showtimes for just 3 days to save space
-  for (let day = 0; day < 3; day++) {
+  // Generate showtimes for 15 days to cover upcoming dates
+  for (let day = 0; day < 15; day++) {
     const date = new Date(currentDate);
     date.setDate(date.getDate() + day);
     
@@ -201,14 +204,15 @@ async function main() {
         }
       }
     }
+    console.log(`Created showtimes for date: ${date.toISOString().split('T')[0]}`);
   }
 
-  console.log('Database seeding completed!');
+  console.log('Database seeding completed.');
 }
 
 main()
   .catch((e) => {
-    console.error('Error seeding database:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {
