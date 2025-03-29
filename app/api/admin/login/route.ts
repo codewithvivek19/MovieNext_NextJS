@@ -15,6 +15,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // For demo purposes, allow admin@example.com/admin to login directly
+    if (email === 'admin@example.com' && password === 'admin') {
+      // Create a JWT token
+      const secret = process.env.JWT_SECRET || 'your-secret-key';
+      const token = sign(
+        {
+          id: 1, // Demo admin ID
+          email: email,
+          name: 'Admin User',
+          is_admin: true,
+        },
+        secret,
+        { expiresIn: '1d' }
+      );
+
+      // Return success response with token
+      const response = NextResponse.json({
+        success: true,
+        user: {
+          id: 1,
+          email: email,
+          name: 'Admin User',
+          is_admin: true,
+        },
+        token,
+      });
+      
+      // Set the token in a cookie as well
+      response.cookies.set({
+        name: 'adminToken',
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // 1 day
+        path: '/',
+      });
+      
+      return response;
+    }
+
     // Find the user with the provided email
     const user = await prisma.user.findUnique({
       where: { email },
@@ -35,20 +75,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // For testing/demo purposes only - in production, always use hashed passwords
-    // This allows 'admin' as the password for the demo
+    // Check password if using database authentication
     let isValidPassword = false;
     
-    // For demo purposes, we allow the literal 'admin' password
-    if (password === 'admin') {
-      isValidPassword = true;
-    } else {
-      // In case we have a real hashed password in the database in the future
-      try {
-        isValidPassword = await compare(password, user.password || '');
-      } catch (e) {
-        console.log('Password comparison error - likely no hashed password stored');
-      }
+    try {
+      isValidPassword = await compare(password, user.password || '');
+    } catch (e) {
+      console.log('Password comparison error - likely no hashed password stored');
     }
 
     if (!isValidPassword) {
@@ -83,7 +116,7 @@ export async function POST(req: NextRequest) {
       token,
     });
     
-    // Set the token in a cookie as well (belt and suspenders approach)
+    // Set the token in a cookie as well
     response.cookies.set({
       name: 'adminToken',
       value: token,
