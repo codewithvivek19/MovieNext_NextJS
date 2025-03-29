@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAdminMiddleware } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic'; // No caching
+
 // GET: Get dashboard stats and recent bookings
 export async function GET(req: NextRequest) {
   try {

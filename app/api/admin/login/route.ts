@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { compare } from 'bcrypt';
 import { sign } from 'jsonwebtoken';
 
+export const dynamic = 'force-dynamic'; // No caching
+
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();

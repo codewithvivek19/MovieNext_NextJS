@@ -3,7 +3,7 @@ import { verify } from 'jsonwebtoken';
 
 // Define the JWT token payload type
 interface JWTPayload {
-  id: string;
+  id: number | string; // Allow both number and string for ID
   email: string;
   name?: string;
   is_admin: boolean;
