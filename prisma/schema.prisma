@@ -12,15 +12,23 @@ datasource db {
 }
 
 model User {
-  id         String    @id @default(uuid())
-  email      String    @unique
-  first_name String?
-  last_name  String?
-  phone      String?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  bookings   Booking[]
-  is_admin   Boolean   @default(false)
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  first_name    String?
+  last_name     String?
+  phone         String?
+  profile_image String?
+  role          UserRole  @default(USER)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  bookings      Booking[]
+  is_admin      Boolean   @default(false)
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 model Movie {
@@ -51,19 +59,19 @@ model Theater {
 }
 
 model Showtime {
-  id             Int       @id @default(autoincrement())
-  movie          Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
-  movieId        Int       @map("movie_id")
-  theater        Theater   @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  theaterId      Int       @map("theater_id")
-  date           DateTime
-  time           String
-  format         String
-  price          Int
-  available_seats Int      @default(0)
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
-  bookings       Booking[]
+  id              Int       @id @default(autoincrement())
+  movie           Movie     @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  movieId         Int       @map("movie_id")
+  theater         Theater   @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  theaterId       Int       @map("theater_id")
+  date            DateTime
+  time            String
+  format          String
+  price           Int
+  available_seats Int       @default(0)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  bookings        Booking[]
 }
 
 model Booking {
@@ -75,6 +83,14 @@ model Booking {
   seats             String // Store as JSON string: ["A1", "A2"]
   total_price       Int
   booking_reference String   @unique
+  payment_method    String?
+  status            BookingStatus @default(CONFIRMED)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }

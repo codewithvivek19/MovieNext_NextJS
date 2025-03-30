@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { toast } from "react-hot-toast"
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -50,32 +51,47 @@ export default function CheckoutPage() {
     }
   }, [router])
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     setLoading(true)
 
-    // Simulate payment processing
-    setTimeout(() => {
-      // Generate a random booking reference ID
-      const bookingId = Math.random().toString(36).substring(2, 10).toUpperCase()
-
-      // Save completed booking to localStorage to simulate a database
-      const booking = {
-        ...bookingDetails,
-        id: bookingId,
-        status: "confirmed",
-        paymentMethod,
-        dateCreated: new Date().toISOString(),
+    try {
+      // Prepare booking data
+      const bookingData = {
+        showtimeId: bookingDetails.showtime.id,
+        seats: bookingDetails.seats.map((seat: any) => seat.id),
+        totalPrice: bookingDetails.total,
+        paymentMethod: paymentMethod
       }
 
-      const existingBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
-      localStorage.setItem("bookings", JSON.stringify([...existingBookings, booking]))
+      // Call the booking API
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create booking')
+      }
 
       // Clear the session booking details
       sessionStorage.removeItem("bookingDetails")
 
+      // Store the booking reference for the confirmation page
+      localStorage.setItem("lastBookingReference", data.booking.booking_reference)
+
       // Navigate to success page
-      router.push(`/booking-confirmation?id=${bookingId}`)
-    }, 2000)
+      router.push(`/booking-confirmation?id=${data.booking.booking_reference}`)
+    } catch (error: any) {
+      console.error('Payment processing error:', error)
+      toast.error(error.message || 'Payment failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!bookingDetails || !bookingDetails.movie || !bookingDetails.theater || !bookingDetails.showtime) {

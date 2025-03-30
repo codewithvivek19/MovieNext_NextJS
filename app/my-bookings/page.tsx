@@ -1,310 +1,283 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { Calendar, Clock, MapPin, TicketIcon, FileEdit, Trash2, AlertCircle, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Separator } from "@/components/ui/separator"
+import Image from "next/image"
+import { format } from "date-fns"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ChevronRight, Film, MapPin, CalendarDays, Clock, Ticket, Users, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+interface Booking {
+  id: number
+  booking_reference: string
+  seats: string
+  total_price: number
+  payment_method: string
+  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED'
+  created_at: string
+  showtime: {
+    id: number
+    date: string
+    time: string
+    format: string
+    movie: {
+      id: number
+      title: string
+      poster: string
+    }
+    theater: {
+      id: number
+      name: string
+      location: string
+    }
+  }
+}
 
 export default function MyBookingsPage() {
   const router = useRouter()
-  const [bookings, setBookings] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [openDialog, setOpenDialog] = useState(false)
-  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("upcoming")
 
   useEffect(() => {
-    // Get bookings from localStorage
-    const storedBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
-    setBookings(storedBookings)
-    setIsLoading(false)
-  }, [])
-
-  const cancelBooking = (bookingId: string) => {
-    setBookingToCancel(bookingId)
-    setOpenDialog(true)
-  }
-
-  const confirmCancelBooking = () => {
-    if (!bookingToCancel) return
-
-    const updatedBookings = bookings.map((booking) => {
-      if (booking.id === bookingToCancel) {
-        return { ...booking, status: "cancelled" }
+    async function fetchBookings() {
+      try {
+        setLoading(true)
+        const response = await fetch("/api/bookings")
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Not authenticated
+            router.push("/sign-in?returnUrl=/my-bookings")
+            return
+          }
+          throw new Error("Failed to fetch bookings")
+        }
+        
+        const data = await response.json()
+        setBookings(data.bookings)
+      } catch (err) {
+        console.error("Error fetching bookings:", err)
+        setError("Failed to load your bookings")
+      } finally {
+        setLoading(false)
       }
-      return booking
-    })
+    }
+    
+    fetchBookings()
+  }, [router])
 
-    setBookings(updatedBookings)
-    localStorage.setItem("bookings", JSON.stringify(updatedBookings))
-    setOpenDialog(false)
-    setBookingToCancel(null)
-  }
-
-  const getActiveBookings = () => {
-    return bookings.filter((booking) => booking.status !== "cancelled")
-  }
-
-  const getCancelledBookings = () => {
-    return bookings.filter((booking) => booking.status === "cancelled")
-  }
-
-  const canReschedule = (date: string) => {
-    const bookingDate = new Date(date)
-    const now = new Date()
-    // Check if booking is in the future
-    return bookingDate > now
+  const parseSeats = (seatsJson: string) => {
+    try {
+      return JSON.parse(seatsJson)
+    } catch (e) {
+      return []
+    }
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    })
+    try {
+      return format(new Date(dateString), "MMMM dd, yyyy")
+    } catch (e) {
+      return dateString
+    }
   }
 
-  const isPastBooking = (dateString: string) => {
-    const bookingDate = new Date(dateString)
-    const now = new Date()
-    return bookingDate < now
+  const handleViewTicket = (bookingReference: string) => {
+    router.push(`/booking-confirmation?id=${bookingReference}`)
   }
 
-  if (isLoading) {
-    return <div className="container mx-auto px-4 py-8 text-center">Loading your bookings...</div>
-  }
+  // Filter bookings based on date
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const upcomingBookings = bookings.filter(booking => {
+    const showDate = new Date(booking.showtime.date)
+    return showDate >= today && booking.status !== 'CANCELLED'
+  })
+  
+  const pastBookings = bookings.filter(booking => {
+    const showDate = new Date(booking.showtime.date)
+    return showDate < today || booking.status === 'CANCELLED'
+  })
 
-  if (bookings.length === 0) {
+  const filteredBookings = activeTab === "upcoming" ? upcomingBookings : pastBookings
+
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-lg mx-auto">
-          <CardHeader>
-            <CardTitle className="text-center">No Bookings Found</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center py-8">
-            <div className="mx-auto w-16 h-16 text-muted-foreground mb-4">
-              <TicketIcon size={64} />
-            </div>
-            <p className="text-muted-foreground mb-4">You don't have any movie bookings yet.</p>
-            <Button asChild>
-              <Link href="/">Browse Movies</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto py-10 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+        <p className="mt-2">Loading your bookings...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-10 text-center">
+        <p className="text-red-500">{error}</p>
+        <Button className="mt-4" onClick={() => router.push("/")}>
+          Go back to home
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold mb-6">My Bookings</h1>
-
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="active">Active Bookings</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelled Bookings</TabsTrigger>
+      
+      <Tabs defaultValue="upcoming" onValueChange={setActiveTab}>
+        <TabsList className="mb-8">
+          <TabsTrigger value="upcoming">
+            Upcoming ({upcomingBookings.length})
+          </TabsTrigger>
+          <TabsTrigger value="past">
+            Past & Cancelled ({pastBookings.length})
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="active">
-          {getActiveBookings().length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">No active bookings found.</p>
-              </CardContent>
-            </Card>
+        
+        <TabsContent value="upcoming" className="space-y-6">
+          {upcomingBookings.length > 0 ? (
+            upcomingBookings.map((booking) => (
+              <BookingCard 
+                key={booking.id} 
+                booking={booking} 
+                onViewTicket={handleViewTicket} 
+              />
+            ))
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {getActiveBookings().map((booking) => (
-                <Card key={booking.id} className={isPastBooking(booking.date) ? "border-muted" : ""}>
-                  {isPastBooking(booking.date) && (
-                    <div className="bg-muted w-full text-center py-1 text-xs">COMPLETED</div>
-                  )}
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-xl">{booking.movie.title}</CardTitle>
-                      <Badge variant={isPastBooking(booking.date) ? "outline" : "default"}>{booking.id}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="flex gap-4 mb-3">
-                      <div className="relative w-16 h-24 overflow-hidden rounded">
-                        <Image
-                          src={booking.movie.poster || "/placeholder.svg"}
-                          alt={booking.movie.title}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div>
-                        <div className="space-y-1">
-                          <div className="flex items-center">
-                            <Calendar size={14} className="mr-2 text-muted-foreground" />
-                            <span>{formatDate(booking.date)}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Clock size={14} className="mr-2 text-muted-foreground" />
-                            <span>{booking.showtime.time}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <MapPin size={14} className="mr-2 text-muted-foreground" />
-                            <span>{booking.theater.name}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator className="my-3" />
-
-                    <div className="flex justify-between">
-                      <div>
-                        <span className="text-sm text-muted-foreground">Seats:</span>
-                        <span className="ml-2 text-sm">{booking.seats.map((s: any) => s.id).join(", ")}</span>
-                      </div>
-                      <div>
-                        <span className="text-sm font-semibold">${booking.total + 2}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-2">
-                    <div className="flex justify-between w-full">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/booking-confirmation?id=${booking.id}`)}
-                      >
-                        <Eye size={16} className="mr-2" />
-                        View
-                      </Button>
-                      <div className="flex gap-2">
-                        {!isPastBooking(booking.date) && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={!canReschedule(booking.date)}
-                              onClick={() => router.push(`/reschedule?id=${booking.id}`)}
-                            >
-                              <FileEdit size={16} className="mr-2" />
-                              Reschedule
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => cancelBooking(booking.id)}>
-                              <Trash2 size={16} className="mr-2" />
-                              Cancel
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+            <div className="text-center p-10 bg-muted rounded-lg">
+              <p className="text-muted-foreground mb-4">You don't have any upcoming bookings</p>
+              <Button onClick={() => router.push("/")}>Browse Movies</Button>
             </div>
           )}
         </TabsContent>
-
-        <TabsContent value="cancelled">
-          {getCancelledBookings().length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">No cancelled bookings found.</p>
-              </CardContent>
-            </Card>
+        
+        <TabsContent value="past" className="space-y-6">
+          {pastBookings.length > 0 ? (
+            pastBookings.map((booking) => (
+              <BookingCard 
+                key={booking.id} 
+                booking={booking} 
+                onViewTicket={handleViewTicket} 
+                isPast
+              />
+            ))
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {getCancelledBookings().map((booking) => (
-                <Card key={booking.id} className="border-muted">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-xl text-muted-foreground">{booking.movie.title}</CardTitle>
-                      <Badge variant="outline">{booking.id}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="flex gap-4 mb-3">
-                      <div className="relative w-16 h-24 overflow-hidden rounded opacity-50">
-                        <Image
-                          src={booking.movie.poster || "/placeholder.svg"}
-                          alt={booking.movie.title}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="text-muted-foreground">
-                        <div className="space-y-1">
-                          <div className="flex items-center">
-                            <Calendar size={14} className="mr-2" />
-                            <span>{formatDate(booking.date)}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Clock size={14} className="mr-2" />
-                            <span>{booking.showtime.time}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <MapPin size={14} className="mr-2" />
-                            <span>{booking.theater.name}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator className="my-3" />
-
-                    <div className="flex justify-between text-muted-foreground">
-                      <div>
-                        <span className="text-sm">Seats:</span>
-                        <span className="ml-2 text-sm">{booking.seats.map((s: any) => s.id).join(", ")}</span>
-                      </div>
-                      <div>
-                        <span className="text-sm">${booking.total + 2}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-2">
-                    <div className="w-full">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <AlertCircle size={14} className="mr-2" />
-                        <span>This booking was cancelled</span>
-                      </div>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+            <div className="text-center p-10 bg-muted rounded-lg">
+              <p className="text-muted-foreground">No past bookings found</p>
             </div>
           )}
         </TabsContent>
       </Tabs>
-
-      <AlertDialog open={openDialog} onOpenChange={setOpenDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel this booking? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No, keep it</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmCancelBooking}>Yes, cancel booking</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
+  )
+}
+
+function BookingCard({ 
+  booking, 
+  onViewTicket,
+  isPast = false 
+}: { 
+  booking: Booking, 
+  onViewTicket: (reference: string) => void,
+  isPast?: boolean
+}) {
+  const seats = typeof booking.seats === 'string' ? JSON.parse(booking.seats) : booking.seats
+  
+  const statusColor = {
+    CONFIRMED: "bg-green-500",
+    PENDING: "bg-yellow-500",
+    CANCELLED: "bg-red-500"
+  }[booking.status]
+  
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>{booking.showtime.movie.title}</CardTitle>
+            <CardDescription>
+              Booking Reference: {booking.booking_reference}
+            </CardDescription>
+          </div>
+          <Badge variant={isPast || booking.status === 'CANCELLED' ? "outline" : "default"} className={booking.status === 'CANCELLED' ? "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400" : ""}>
+            {booking.status === 'CONFIRMED' ? (isPast ? "Completed" : "Confirmed") : booking.status}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="md:col-span-1">
+            <div className="relative aspect-[2/3] rounded-md overflow-hidden">
+              <Image
+                src={booking.showtime.movie.poster || "/placeholder.svg"}
+                alt={booking.showtime.movie.title}
+                fill
+                className="object-cover"
+              />
+            </div>
+          </div>
+          <div className="md:col-span-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{formatDate(booking.showtime.date)}</span>
+                </div>
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{booking.showtime.time}</span>
+                </div>
+                <div className="flex items-center">
+                  <Film className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{booking.showtime.format}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{booking.showtime.theater.name}</span>
+                </div>
+                <div className="flex items-center">
+                  <Ticket className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>
+                    {Array.isArray(seats) 
+                      ? seats.join(", ") 
+                      : "No seats information"
+                    }
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{Array.isArray(seats) ? seats.length : 0} tickets</span>
+                </div>
+              </div>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="font-semibold">${booking.total_price.toFixed(2)}</p>
+              </div>
+              <Button
+                onClick={() => onViewTicket(booking.booking_reference)}
+                variant={isPast ? "outline" : "default"}
+              >
+                View Ticket <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
