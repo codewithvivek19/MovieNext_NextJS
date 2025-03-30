@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify, sign, Secret, SignOptions } from 'jsonwebtoken';
-import { hash, compare } from 'bcrypt';
+import { createHash } from 'crypto';
 
 // Define the JWT token payload types
 interface JWTAdminPayload {
@@ -49,25 +49,15 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-// Password hashing
-export async function hashPassword(password: string): Promise<string> {
-  try {
-    const saltRounds = 10;
-    return await hash(password, saltRounds);
-  } catch (error) {
-    console.error('Password hashing error:', error);
-    throw new Error('Password hashing failed');
-  }
+// Simple password hashing using SHA-256
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
 
 // Password verification
-export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  try {
-    return await compare(password, hashedPassword);
-  } catch (error) {
-    console.error('Password verification error:', error);
-    return false;
-  }
+export function verifyPassword(password: string, hashedPassword: string): boolean {
+  const hashedInput = hashPassword(password);
+  return hashedInput === hashedPassword;
 }
 
 // Middleware to protect admin routes
@@ -165,8 +155,7 @@ export async function isAuthenticatedMiddleware(req: NextRequest) {
       userId: decoded.id,
       email: decoded.email,
       name: decoded.name,
-      isAdmin: decoded.is_admin,
-      role: 'role' in decoded ? decoded.role : undefined
+      role: 'is_admin' in decoded && decoded.is_admin ? 'admin' : 'user'
     };
   } catch (error) {
     console.error('Auth middleware error:', error);
