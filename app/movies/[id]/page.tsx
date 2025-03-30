@@ -40,13 +40,32 @@ export function MovieDetailClient({ movieId }: MovieDetailPageProps) {
           setError("Movie not found")
         }
         
-        // Fetch theaters
+        // Fetch theaters with cache control
         const fetchedTheaters = await fetchTheaters()
         setTheaters(fetchedTheaters)
         
-        // Fetch showtimes for this movie
-        const movieShowtimes = await getShowtimesForMovie(Number.parseInt(movieId), selectedDate)
-        setShowtimes(movieShowtimes)
+        // Fetch showtimes with fresh data
+        const currentDate = new Date(selectedDate);
+        const formattedDate = currentDate.toISOString().split('T')[0];
+        console.log("Fetching showtimes for date:", formattedDate);
+        
+        // Use direct fetch to bypass cache and ensure fresh data
+        const response = await fetch(
+          `/api/public/movies/${movieId}/showtimes?date=${formattedDate}`,
+          { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch showtimes for movie ${movieId}`);
+        }
+        
+        const data = await response.json();
+        setShowtimes(data.showtimes);
         
         // Reset selected theater and showtime when date changes
         setSelectedTheater(null)

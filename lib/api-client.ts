@@ -18,6 +18,8 @@ export interface Theater {
   name: string
   location: string
   rating: number
+  seating_capacity?: number
+  amenities?: string
 }
 
 export interface Showtime {
@@ -25,15 +27,16 @@ export interface Showtime {
   theaterId: number
   movieId: number
   time: string
-  format: "standard" | "imax" | "vip"
+  format: "standard" | "imax" | "premium" | "vip"
   price: number
   date: string
+  available_seats?: number
+  movie?: Partial<Movie>
+  theater?: Theater
 }
 
-// Cache for data
+// Cache for movie data only (theaters and showtimes should be always fresh)
 let moviesCache: Movie[] = [];
-let theatersCache: Theater[] = [];
-let showtimesCache: Showtime[] = [];
 
 // Fetch all movies
 export async function fetchMovies(): Promise<Movie[]> {
@@ -82,17 +85,13 @@ export async function getMovieById(id: number): Promise<Movie | null> {
 // Fetch all theaters
 export async function fetchTheaters(): Promise<Theater[]> {
   try {
-    if (theatersCache.length > 0) {
-      return theatersCache;
-    }
-    
+    // Always fetch fresh theater data
     const response = await fetch('/api/public/theaters');
     if (!response.ok) {
       throw new Error('Failed to fetch theaters');
     }
     
     const data = await response.json();
-    theatersCache = data.theaters;
     return data.theaters;
   } catch (error) {
     console.error('Error fetching theaters:', error);
@@ -103,13 +102,7 @@ export async function fetchTheaters(): Promise<Theater[]> {
 // Get a theater by ID
 export async function getTheaterById(id: number): Promise<Theater | null> {
   try {
-    // Try cache first
-    if (theatersCache.length > 0) {
-      const cachedTheater = theatersCache.find(t => t.id === id);
-      if (cachedTheater) return cachedTheater;
-    }
-    
-    // Fetch from API
+    // Always fetch fresh theater data
     const response = await fetch(`/api/public/theaters/${id}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch theater with ID ${id}`);
@@ -126,17 +119,13 @@ export async function getTheaterById(id: number): Promise<Theater | null> {
 // Fetch all showtimes
 export async function fetchShowtimes(): Promise<Showtime[]> {
   try {
-    if (showtimesCache.length > 0) {
-      return showtimesCache;
-    }
-    
+    // Always fetch fresh showtime data
     const response = await fetch('/api/public/showtimes');
     if (!response.ok) {
       throw new Error('Failed to fetch showtimes');
     }
     
     const data = await response.json();
-    showtimesCache = data.showtimes;
     return data.showtimes;
   } catch (error) {
     console.error('Error fetching showtimes:', error);
@@ -154,7 +143,14 @@ export async function getShowtimesForMovie(movieId: number, date?: string): Prom
       url += `?date=${date}`;
     }
     
-    const response = await fetch(url);
+    // Always fetch fresh showtime data
+    const response = await fetch(url, { 
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch showtimes for movie ${movieId}`);
     }

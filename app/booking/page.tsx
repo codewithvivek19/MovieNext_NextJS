@@ -48,8 +48,11 @@ export default function BookingPage() {
       
       if (movieId) {
         try {
-          // Fetch movie
-          const fetchedMovie = await fetch(`/api/public/movies/${movieId}`)
+          // Fetch movie with cache busting
+          const fetchedMovie = await fetch(`/api/public/movies/${movieId}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          })
             .then(res => res.json())
             .then(data => data.movie)
           
@@ -57,9 +60,12 @@ export default function BookingPage() {
             setMovie(fetchedMovie)
           }
           
-          // Fetch theater
+          // Fetch theater with cache busting
           if (theaterId) {
-            const fetchedTheater = await fetch(`/api/public/theaters/${theaterId}`)
+            const fetchedTheater = await fetch(`/api/public/theaters/${theaterId}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            })
               .then(res => res.json())
               .then(data => data.theater)
             
@@ -68,9 +74,12 @@ export default function BookingPage() {
             }
           }
           
-          // Fetch showtime
+          // Fetch showtime with cache busting
           if (showtimeId) {
-            const fetchedShowtime = await fetch(`/api/public/showtimes/${showtimeId}`)
+            const fetchedShowtime = await fetch(`/api/public/showtimes/${showtimeId}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            })
               .then(res => res.json())
               .then(data => data.showtime)
             
