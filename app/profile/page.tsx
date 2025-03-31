@@ -1,149 +1,167 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
   const router = useRouter();
-  const [fullName, setFullName] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateMessage, setUpdateMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
-  // Redirect if not logged in
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+        });
 
-  // Load user data
-  useEffect(() => {
-    if (user?.user_metadata?.full_name) {
-      setFullName(user.user_metadata.full_name);
-    }
-  }, [user]);
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+        const data = await response.json();
+        if (data.authenticated && data.user) {
+          setProfile(data.user);
+        } else {
+          router.push('/sign-in');
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        router.push('/sign-in');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [router]);
+
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsUpdating(true);
-    setUpdateMessage(null);
+    setUpdating(true);
 
     try {
-      const { error } = await fetch('/api/update-profile', {
-        method: 'POST',
+      const formData = new FormData(e.currentTarget);
+      const response = await fetch('/api/auth/update-profile', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ fullName }),
-      }).then(res => res.json());
+        body: JSON.stringify({
+          firstName: formData.get('firstName'),
+          lastName: formData.get('lastName'),
+        }),
+      });
 
-      if (error) {
-        throw new Error(error);
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
       }
 
-      setUpdateMessage({
-        type: 'success',
-        text: 'Your profile has been updated successfully!'
-      });
-    } catch (error: any) {
-      setUpdateMessage({
-        type: 'error',
-        text: error.message || 'Failed to update profile. Please try again.'
-      });
+      const data = await response.json();
+      setProfile(data.user);
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
     } finally {
-      setIsUpdating(false);
+      setUpdating(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-16 flex justify-center items-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
+          <div className="h-32 bg-muted rounded"></div>
+        </div>
       </div>
     );
   }
 
+  if (!profile) {
+    return null;
+  }
+
   return (
-    <div className="container mx-auto px-4 py-16 max-w-3xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Your Profile</CardTitle>
-          <CardDescription>
-            View and edit your profile information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleUpdateProfile} className="space-y-6">
-            {updateMessage && (
-              <div className={`p-3 rounded-md flex items-center gap-2 text-sm ${
-                updateMessage.type === 'success' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-destructive/15 text-destructive'
-              }`}>
-                <AlertCircle size={16} />
-                <p>{updateMessage.text}</p>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Profile Settings</h1>
+
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="grid gap-4">
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profile.email}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      defaultValue={profile.firstName || ''}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      defaultValue={profile.lastName || ''}
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  value={user?.email || ''} 
-                  disabled 
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your email cannot be changed
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input 
-                  id="fullName" 
-                  value={fullName} 
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="mt-1"
-                  disabled={isUpdating}
-                />
-              </div>
-            </div>
-            
-            <Button type="submit" disabled={isUpdating}>
-              {isUpdating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Profile'
-              )}
+
+              <Button type="submit" disabled={updating}>
+                {updating ? 'Updating...' : 'Update Profile'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Security</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/change-password')}
+            >
+              Change Password
             </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="border-t pt-6">
-          <div className="w-full space-y-2">
-            <h3 className="text-lg font-medium">Account Settings</h3>
-            <div className="flex flex-col gap-4">
-              <Button variant="outline" size="sm" className="justify-start">
-                Change Password
-              </Button>
-              <Button variant="destructive" size="sm" className="justify-start">
-                Delete Account
-              </Button>
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 
