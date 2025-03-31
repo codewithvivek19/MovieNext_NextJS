@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +12,7 @@ import { Label } from '@/components/ui/label';
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { adminLogin, isAdmin } = useAuth();
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('admin');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,12 +26,11 @@ export default function AdminLoginPage() {
   }, []);
   
   useEffect(() => {
-    // Check if already logged in
-    const adminToken = localStorage.getItem('adminToken');
-    if (adminToken) {
+    // Check if already logged in as admin
+    if (isAdmin) {
       router.push('/admin');
     }
-  }, [router]);
+  }, [isAdmin, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,14 +52,18 @@ export default function AdminLoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Store token in localStorage
-      localStorage.setItem('adminToken', data.token);
+      // Use auth context to login as admin
+      adminLogin(data.token, data.user);
+      
+      // Show success message
+      toast.success('Admin login successful');
       
       // Redirect to admin dashboard
       router.push('/admin');
     } catch (error) {
       console.error('Login error:', error);
       setError(error instanceof Error ? error.message : 'Invalid email or password');
+      toast.error(error instanceof Error ? error.message : 'Login failed');
     } finally {
       setIsLoading(false);
     }

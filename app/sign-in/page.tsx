@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { useAuth } from "@/lib/AuthContext"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -28,6 +29,7 @@ const formSchema = z.object({
 
 export default function SignInPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -56,8 +58,8 @@ export default function SignInPage() {
         throw new Error(data.error || "Invalid email or password")
       }
 
-      // Login successful
-      toast.success("Signed in successfully!")
+      // Store token and user data in auth context
+      login(data.token, data.user)
       
       // Redirect to home page or last intended destination
       const returnUrl = new URLSearchParams(window.location.search).get('returnUrl')

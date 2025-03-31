@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Film, Menu, X, User, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,61 +17,16 @@ import {
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<{ name?: string, email?: string } | null>(null);
+  const { isLoggedIn, isAdmin, user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-
-  useEffect(() => {
-    // Check if user is logged in from cookie
-    const hasToken = document.cookie.includes('token=');
-    setIsLoggedIn(hasToken);
-
-    // Check if admin is logged in
-    const hasAdminToken = document.cookie.includes('adminToken=');
-    setIsAdminLoggedIn(hasAdminToken);
-
-    // Try to get user data if available
-    const getUserData = async () => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setUserData(data.user);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user data:', error);
-      }
-    };
-
-    if (hasToken) {
-      getUserData();
-    }
-  }, []);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const handleSignOut = async () => {
-    try {
-      // Clear cookies
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;';
-      document.cookie = 'adminToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;';
-      
-      // Redirect to home page
-      setIsLoggedIn(false);
-      setIsAdminLoggedIn(false);
-      router.push('/');
-      router.refresh();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+  const handleSignOut = () => {
+    logout();
   };
 
   const navLinks = [
@@ -79,12 +35,20 @@ export default function Navbar() {
     { name: 'Theaters', href: '/theaters' },
   ];
 
-  // Add Admin link for all users - the admin page itself will handle access control
-  navLinks.push({ 
-    name: 'Admin', 
-    href: '/admin/login', 
-    icon: <ShieldCheck size={16} className="mr-1" /> 
-  });
+  // Add Admin link if user is admin, otherwise link to admin login
+  if (isAdmin) {
+    navLinks.push({ 
+      name: 'Admin Dashboard', 
+      href: '/admin', 
+      icon: <ShieldCheck size={16} className="mr-1" /> 
+    });
+  } else {
+    navLinks.push({ 
+      name: 'Admin', 
+      href: '/admin/login', 
+      icon: <ShieldCheck size={16} className="mr-1" /> 
+    });
+  }
 
   return (
     <nav className="bg-background py-4 border-b">
@@ -125,7 +89,7 @@ export default function Navbar() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>
-                      {userData?.name || userData?.email || 'My Account'}
+                      {user?.name || user?.email || 'My Account'}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
@@ -134,6 +98,11 @@ export default function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/profile">Profile</Link>
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin">Admin Dashboard</Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -184,7 +153,7 @@ export default function Navbar() {
             {isLoggedIn ? (
               <div className="space-y-3">
                 <div className="font-medium flex items-center justify-between">
-                  <span>Account</span>
+                  <span>{user?.name || user?.email || 'Account'}</span>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <User className="h-5 w-5" />
                   </Button>
@@ -192,6 +161,11 @@ export default function Navbar() {
                 <Link href="/my-bookings" className="block py-2 text-muted-foreground" onClick={toggleMenu}>
                   My Bookings
                 </Link>
+                {isAdmin && (
+                  <Link href="/admin" className="block py-2 text-muted-foreground" onClick={toggleMenu}>
+                    Admin Dashboard
+                  </Link>
+                )}
                 <Button
                   variant="ghost"
                   className="w-full justify-start p-0 h-auto font-normal text-destructive"

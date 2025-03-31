@@ -20,10 +20,14 @@ model User {
   phone         String?
   profile_image String?
   role          UserRole  @default(USER)
+  is_admin      Boolean   @default(false)
+  last_login    DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   bookings      Booking[]
-  is_admin      Boolean   @default(false)
+
+  @@index([email])
+  @@index([role])
 }
 
 enum UserRole {
@@ -79,7 +83,7 @@ model Booking {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId            String   @map("user_id")
   showtime          Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
-  showtimeId        Int      @map("showtime_id") 
+  showtimeId        Int      @map("showtime_id")
   seats             String // Store as JSON string: ["A1", "A2"]
   total_price       Int
   booking_reference String   @unique
