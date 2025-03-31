@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Film, Menu, X, User, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -13,20 +13,44 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserButton, SignedIn, SignedOut, useUser, useClerk, useAuth } from '@clerk/nextjs';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState<{ name?: string, email?: string } | null>(null);
   const pathname = usePathname();
-  const { isLoaded, user } = useUser();
-  const { signOut } = useClerk();
-  const { isSignedIn } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    // Check if admin is logged in from localStorage
-    const adminToken = localStorage.getItem('adminToken');
-    setIsAdminLoggedIn(adminToken === 'admin-token');
+    // Check if user is logged in from cookie
+    const hasToken = document.cookie.includes('token=');
+    setIsLoggedIn(hasToken);
+
+    // Check if admin is logged in
+    const hasAdminToken = document.cookie.includes('adminToken=');
+    setIsAdminLoggedIn(hasAdminToken);
+
+    // Try to get user data if available
+    const getUserData = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data.user);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+      }
+    };
+
+    if (hasToken) {
+      getUserData();
+    }
   }, []);
 
   const toggleMenu = () => {
@@ -34,7 +58,19 @@ export default function Navbar() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      // Clear cookies
+      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;';
+      document.cookie = 'adminToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;';
+      
+      // Redirect to home page
+      setIsLoggedIn(false);
+      setIsAdminLoggedIn(false);
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const navLinks = [
@@ -44,7 +80,11 @@ export default function Navbar() {
   ];
 
   // Add Admin link for all users - the admin page itself will handle access control
-  navLinks.push({ name: 'Admin', href: '/admin/login', icon: <ShieldCheck size={16} className="mr-1" /> });
+  navLinks.push({ 
+    name: 'Admin', 
+    href: '/admin/login', 
+    icon: <ShieldCheck size={16} className="mr-1" /> 
+  });
 
   return (
     <nav className="bg-background py-4 border-b">
@@ -72,15 +112,37 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-3">
-            <SignedIn>
+            {isLoggedIn ? (
               <div className="flex items-center gap-3">
-                <Link href="/bookings">
+                <Link href="/my-bookings">
                   <Button variant="ghost" size="sm">My Bookings</Button>
                 </Link>
-                <UserButton afterSignOutUrl="/" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>
+                      {userData?.name || userData?.email || 'My Account'}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/my-bookings">My Bookings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-            </SignedIn>
-            <SignedOut>
+            ) : (
               <div className="flex items-center gap-3">
                 <Link href="/sign-in">
                   <Button variant="ghost" size="sm">
@@ -91,7 +153,7 @@ export default function Navbar() {
                   <Button size="sm">Sign Up</Button>
                 </Link>
               </div>
-            </SignedOut>
+            )}
           </div>
         </div>
 
@@ -119,20 +181,22 @@ export default function Navbar() {
           ))}
 
           <div className="pt-4 border-t">
-            <SignedIn>
+            {isLoggedIn ? (
               <div className="space-y-3">
                 <div className="font-medium flex items-center justify-between">
                   <span>Account</span>
-                  <UserButton afterSignOutUrl="/" />
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <User className="h-5 w-5" />
+                  </Button>
                 </div>
-                <Link href="/bookings" className="block py-2 text-muted-foreground" onClick={toggleMenu}>
+                <Link href="/my-bookings" className="block py-2 text-muted-foreground" onClick={toggleMenu}>
                   My Bookings
                 </Link>
                 <Button
                   variant="ghost"
                   className="w-full justify-start p-0 h-auto font-normal text-destructive"
                   onClick={() => {
-                    signOut();
+                    handleSignOut();
                     toggleMenu();
                   }}
                 >
@@ -140,8 +204,7 @@ export default function Navbar() {
                   Sign Out
                 </Button>
               </div>
-            </SignedIn>
-            <SignedOut>
+            ) : (
               <div className="flex flex-col gap-3">
                 <Link href="/sign-in" onClick={toggleMenu}>
                   <Button variant="outline" className="w-full">Sign In</Button>
@@ -150,7 +213,7 @@ export default function Navbar() {
                   <Button className="w-full">Sign Up</Button>
                 </Link>
               </div>
-            </SignedOut>
+            )}
           </div>
         </div>
       )}

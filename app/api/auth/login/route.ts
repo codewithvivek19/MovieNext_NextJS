@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify password (non-async function now)
-    const isValidPassword = verifyPassword(password, user.password);
+    // Verify password
+    const isValidPassword = await verifyPassword(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(

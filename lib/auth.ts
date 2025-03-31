@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify, sign, Secret, SignOptions } from 'jsonwebtoken';
-import { createHash } from 'crypto';
 
 // Define the JWT token payload types
 interface JWTAdminPayload {
@@ -49,9 +48,16 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-// Simple password hashing using SHA-256
+// Simple string hash function (not secure for production)
 export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const char = password.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Convert to hex string and ensure it's positive
+  return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
 // Password verification
