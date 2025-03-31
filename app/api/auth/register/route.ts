@@ -6,19 +6,40 @@ export const dynamic = 'force-dynamic'; // No caching
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, firstName, lastName, phone } = await req.json();
-
-    // Validate required fields
-    if (!email || !password) {
+    // Parse request body with error handling
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Failed to parse request body:', error);
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Invalid request body format' },
         { status: 400 }
       );
     }
 
+    const { email, password, firstName, lastName, phone } = body;
+
+    // Validate required fields
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return NextResponse.json(
+        { error: 'Valid email is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password must be at least 6 characters' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = email.trim();
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: trimmedEmail }
     });
 
     if (existingUser) {
@@ -29,16 +50,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Hash password
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = hashPassword(password);
 
-    // Create new user
+    // Create new user with validated data
     const newUser = await prisma.user.create({
       data: {
-        email,
+        email: trimmedEmail,
         password: hashedPassword,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        phone: phone || null,
+        first_name: firstName && typeof firstName === 'string' ? firstName.trim() : null,
+        last_name: lastName && typeof lastName === 'string' ? lastName.trim() : null,
+        phone: phone && typeof phone === 'string' ? phone.trim() : null,
         role: 'USER',
         is_admin: false
       }
@@ -48,7 +69,7 @@ export async function POST(req: NextRequest) {
     const token = generateToken({
       id: newUser.id,
       email: newUser.email,
-      name: newUser.first_name ? `${newUser.first_name} ${newUser.last_name || ''}` : email,
+      name: newUser.first_name ? `${newUser.first_name} ${newUser.last_name || ''}` : trimmedEmail,
       role: 'USER',
       is_admin: false
     });
@@ -76,7 +97,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'Something went wrong during registration' },
+      { error: 'Something went wrong during registration. Please try again.' },
       { status: 500 }
     );
   }

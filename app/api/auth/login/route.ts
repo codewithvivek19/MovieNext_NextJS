@@ -6,19 +6,40 @@ export const dynamic = 'force-dynamic'; // No caching
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
-
-    // Validate required fields
-    if (!email || !password) {
+    // Parse request body with error handling
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Failed to parse request body:', error);
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Invalid request body format' },
         { status: 400 }
       );
     }
 
+    const { email, password } = body;
+
+    // Validate required fields
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return NextResponse.json(
+        { error: 'Valid email is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!password || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = email.trim();
+
     // Find the user with the provided email
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: trimmedEmail },
     });
 
     if (!user) {
@@ -29,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify password
-    const isValidPassword = await verifyPassword(password, user.password);
+    const isValidPassword = verifyPassword(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -50,7 +71,7 @@ export async function POST(req: NextRequest) {
     const token = generateToken({
       id: user.id,
       email: user.email,
-      name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : email,
+      name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : trimmedEmail,
       role: user.role,
       is_admin: false
     });
@@ -78,7 +99,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Something went wrong during login' },
+      { error: 'Something went wrong during login. Please try again.' },
       { status: 500 }
     );
   }

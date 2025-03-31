@@ -1,48 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { sign } from 'jsonwebtoken';
+import { generateToken, verifyPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // No caching
 
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
-    const { email, password } = data;
-
-    if (!email || !password) {
+    // Parse request body with error handling
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Failed to parse request body:', error);
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Invalid request body format' },
         { status: 400 }
       );
     }
 
-    // For demo purposes, allow admin@example.com/admin to login directly
-    if (email === 'admin@example.com' && password === 'admin') {
-      // Create a JWT token
-      const secret = process.env.JWT_SECRET || 'your-secret-key';
-      const token = sign(
-        {
-          id: 1, // Demo admin ID
-          email: email,
-          name: 'Admin User',
-          is_admin: true,
-        },
-        secret,
-        { expiresIn: '1d' }
+    const { email, password } = body;
+
+    // Validate required fields
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return NextResponse.json(
+        { error: 'Valid email is required' },
+        { status: 400 }
       );
+    }
+
+    if (!password || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = email.trim();
+
+    // For demo purposes, allow admin@example.com/admin to login directly
+    if (trimmedEmail === 'admin@example.com' && password === 'admin') {
+      // Create a JWT token
+      const token = generateToken({
+        id: 1, // Demo admin ID
+        email: trimmedEmail,
+        name: 'Admin User',
+        is_admin: true
+      });
 
       // Return success response with token
       const response = NextResponse.json({
         success: true,
         user: {
           id: 1,
-          email: email,
+          email: trimmedEmail,
           name: 'Admin User',
           is_admin: true,
         },
         token,
       });
-      
+
       // Set the token in a cookie as well
       response.cookies.set({
         name: 'adminToken',
@@ -52,13 +68,13 @@ export async function POST(req: NextRequest) {
         maxAge: 60 * 60 * 24, // 1 day
         path: '/',
       });
-      
+
       return response;
     }
 
     // Find the user with the provided email
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: trimmedEmail },
     });
 
     if (!user) {
@@ -78,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     // For simplicity in the demo, accept 'admin' as the password for any admin user
     // This avoids bcrypt dependency issues in the serverless environment
-    const isValidPassword = password === 'admin';
+    const isValidPassword = password === 'admin' || verifyPassword(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -88,30 +104,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Create a JWT token
-    const secret = process.env.JWT_SECRET || 'your-secret-key';
-    const token = sign(
-      {
-        id: user.id,
-        email: user.email,
-        name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : email,
-        is_admin: user.is_admin,
-      },
-      secret,
-      { expiresIn: '1d' }
-    );
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : trimmedEmail,
+      is_admin: true
+    });
 
-    // Set HTTP-only cookie with the token
+    // Create response with user data (without password)
+    const { password: _, ...userWithoutPassword } = user;
+    
     const response = NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : email,
-        is_admin: user.is_admin,
-      },
-      token,
+      user: userWithoutPassword,
+      token
     });
-    
+
     // Set the token in a cookie as well
     response.cookies.set({
       name: 'adminToken',
@@ -121,12 +129,12 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24, // 1 day
       path: '/',
     });
-    
+
     return response;
   } catch (error) {
     console.error('Admin login error:', error);
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong during login. Please try again.' },
       { status: 500 }
     );
   }
