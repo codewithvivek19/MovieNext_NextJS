@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateToken, verifyPassword, simpleVerifyPassword } from '@/lib/auth';
+import { generateToken, verifyPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // No caching
 export const maxDuration = 10; // Set max duration for route
@@ -94,21 +94,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Try to verify with both methods (bcrypt and simple hash)
-      let isValidPassword = false;
-      
-      // For simplicity in the demo, accept 'admin' as the password for any admin user
-      if (password === 'admin') {
-        isValidPassword = true;
-      } else {
-        try {
-          // Try bcrypt comparison first (async)
-          isValidPassword = await verifyPassword(password, user.password);
-        } catch (error) {
-          // If bcrypt fails, try simple verification
-          isValidPassword = simpleVerifyPassword(password, user.password);
-        }
-      }
+      // Verify password using our enhanced method that handles both formats
+      // The verifyPassword function now handles both bcrypt and crypto formats
+      const isValidPassword = await verifyPassword(password, user.password);
 
       if (!isValidPassword) {
         return NextResponse.json(

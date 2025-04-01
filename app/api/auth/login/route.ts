@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { verifyPassword, simpleVerifyPassword, generateToken } from '@/lib/auth';
+import { generateToken, verifyPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // No caching
 
@@ -49,16 +49,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify password with properly awaited async function
-    let isValidPassword = false;
-    
-    try {
-      // Try bcrypt comparison first (async)
-      isValidPassword = await verifyPassword(password, user.password);
-    } catch (error) {
-      // If bcrypt fails, try simple verification
-      isValidPassword = simpleVerifyPassword(password, user.password);
-    }
+    // Verify the password using our enhanced method that handles both formats
+    const isValidPassword = await verifyPassword(password, user.password);
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -75,12 +67,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create JWT token
+    // Create a JWT token
     const token = generateToken({
       id: user.id,
       email: user.email,
       name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : trimmedEmail,
-      role: user.role,
+      role: user.role || 'USER',
       is_admin: false
     });
 
