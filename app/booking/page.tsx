@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { getMovieById, getTheaterById } from "@/lib/api-client"
+import { toast } from "sonner"
 
 const SEAT_PRICE = {
   standard: 10,
@@ -179,6 +180,17 @@ export default function BookingPage() {
   }
 
   const handleCheckout = () => {
+    // Validate selected seats
+    if (!selectedSeats.length) {
+      toast.error("Please select at least one seat");
+      return;
+    }
+
+    if (!movie || !theater || !showtime) {
+      toast.error("Missing booking information. Please try again.");
+      return;
+    }
+
     // Save booking details to session storage
     const bookingDetails = {
       movie: movie,
@@ -189,8 +201,13 @@ export default function BookingPage() {
       total: calculateTotal(),
     }
 
-    sessionStorage.setItem("bookingDetails", JSON.stringify(bookingDetails))
-    router.push("/checkout")
+    try {
+      sessionStorage.setItem("bookingDetails", JSON.stringify(bookingDetails));
+      router.push("/checkout");
+    } catch (error) {
+      console.error("Error saving booking details:", error);
+      toast.error("An error occurred. Please try again.");
+    }
   }
 
   if (loading || !movie || !theater || !showtime) {

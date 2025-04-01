@@ -74,7 +74,7 @@ export default function Header() {
             </Button>
           </Link>
 
-          <Link href="/login">
+          <Link href="/sign-in">
             <Button variant="ghost" size="icon" className="hidden md:flex">
               <User className="h-5 w-5" />
               <span className="sr-only">Account</span>
@@ -117,7 +117,7 @@ export default function Header() {
                   </Link>
                 </SheetClose>
                 <SheetClose asChild>
-                  <Link href="/login" className="flex items-center gap-2 text-sm font-medium">
+                  <Link href="/sign-in" className="flex items-center gap-2 text-sm font-medium">
                     <LogIn className="h-4 w-4" />
                     Sign In
                   </Link>

@@ -1,0 +1,27 @@
+warning: in the working copy of 'app/api/admin/login/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/booking-confirmation/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/booking/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/checkout/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/my-bookings/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/header.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/api-client.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/auth.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'middleware.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'prisma/seed.ts', LF will be replaced by CRLF the next time Git touches it
+app/admin/login/page.tsx
+app/api/admin/login/route.ts
+app/api/auth/login/route.ts
+app/api/auth/register/route.ts
+app/booking-confirmation/page.tsx
+app/booking/page.tsx
+app/checkout/page.tsx
+app/my-bookings/page.tsx
+app/sign-in/page.tsx
+app/sign-up/page.tsx
+components/header.tsx
+components/navbar.tsx
+lib/AuthContext.tsx
+lib/api-client.ts
+lib/auth.ts
+middleware.ts
+prisma/seed.ts

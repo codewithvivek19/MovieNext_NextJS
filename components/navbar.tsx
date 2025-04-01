@@ -55,7 +55,7 @@ export default function Navbar() {
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2">
           <Film size={24} className="text-primary" />
-          <span className="font-bold text-xl">MovieTix</span>
+          <span className="font-bold text-xl">MovieNext</span>
         </Link>
 
         {/* Desktop Navigation */}

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
+import { fetchWithAuth } from "@/lib/api-client"
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -55,6 +56,11 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
+      // Check for valid booking details
+      if (!bookingDetails || !bookingDetails.showtime || !bookingDetails.seats || !Array.isArray(bookingDetails.seats)) {
+        throw new Error('Invalid booking details. Please try again.');
+      }
+
       // Prepare booking data
       const bookingData = {
         showtimeId: bookingDetails.showtime.id,
@@ -63,19 +69,26 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod
       }
 
-      // Call the booking API
-      const response = await fetch('/api/bookings', {
+      // Call the booking API with the authenticated helper
+      const response = await fetchWithAuth('/api/bookings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(bookingData),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 401) {
+          router.push(`/sign-in?returnUrl=${encodeURIComponent('/checkout')}`);
+          return;
+        }
         throw new Error(data.error || 'Failed to create booking')
+      }
+
+      // Ensure we have a booking reference
+      if (!data.booking || !data.booking.booking_reference) {
+        throw new Error('Missing booking reference from server');
       }
 
       // Clear the session booking details
@@ -84,6 +97,8 @@ export default function CheckoutPage() {
       // Store the booking reference for the confirmation page
       localStorage.setItem("lastBookingReference", data.booking.booking_reference)
 
+      toast.success('Booking successful!');
+      
       // Navigate to success page
       router.push(`/booking-confirmation?id=${data.booking.booking_reference}`)
     } catch (error: any) {

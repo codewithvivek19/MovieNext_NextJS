@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify, sign, Secret, SignOptions } from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 // Define the JWT token payload types
 interface JWTAdminPayload {
@@ -48,8 +49,19 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-// Simple string hash function (not secure for production)
-export function hashPassword(password: string): string {
+// Password hashing with bcrypt
+export async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 10);
+}
+
+// Password verification with bcrypt
+export async function verifyPassword(inputPassword: string, hashedPassword: string): Promise<boolean> {
+  return await bcrypt.compare(inputPassword, hashedPassword);
+}
+
+// For backward compatibility - fallback to simple hash if bcrypt fails
+// This is only for transition and should be removed once all passwords are migrated
+export function simpleHashPassword(password: string): string {
   let hash = 0;
   for (let i = 0; i < password.length; i++) {
     const char = password.charCodeAt(i);
@@ -60,9 +72,9 @@ export function hashPassword(password: string): string {
   return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
-// Password verification
-export function verifyPassword(password: string, hashedPassword: string): boolean {
-  const hashedInput = hashPassword(password);
+// Fallback password verification
+export function simpleVerifyPassword(password: string, hashedPassword: string): boolean {
+  const hashedInput = simpleHashPassword(password);
   return hashedInput === hashedPassword;
 }
 

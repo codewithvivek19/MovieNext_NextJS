@@ -38,7 +38,10 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/login', {
+      console.log('Attempting admin login...');
+      // Use the current origin to ensure we connect to the right port
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const response = await fetch(`${baseUrl}/api/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -46,19 +49,39 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Content-Type:', response.headers.get('content-type'));
+
+      // Check for HTML response which may indicate server error
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        console.error('Received HTML instead of JSON');
+        throw new Error('Server error. Please try again later.');
+      }
+
+      // Safely parse JSON response
+      let data;
+      try {
+        data = await response.json();
+        console.log('Response data:', JSON.stringify(data).substring(0, 100) + '...');
+      } catch (jsonError) {
+        console.error('JSON parse error:', jsonError);
+        throw new Error('Unable to process server response. Please try again.');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed');
       }
 
       // Use auth context to login as admin
+      console.log('Admin login successful, setting auth state');
       adminLogin(data.token, data.user);
       
       // Show success message
       toast.success('Admin login successful');
       
       // Redirect to admin dashboard
+      console.log('Redirecting to admin dashboard');
       router.push('/admin');
     } catch (error) {
       console.error('Login error:', error);

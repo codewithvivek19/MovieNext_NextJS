@@ -40,10 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user is logged in on initial load
   useEffect(() => {
+    console.log('AuthContext: checking authentication on initial load');
     checkAuth();
   }, []);
 
   const checkAuth = () => {
+    console.log('AuthContext: checkAuth called');
     setLoading(true);
     try {
       // Check for user data in localStorage
@@ -51,15 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedToken = localStorage.getItem('token');
       const storedAdminToken = localStorage.getItem('adminToken');
 
+      console.log('AuthContext: stored tokens available?', 
+                 !!storedToken, !!storedAdminToken, !!storedUser);
+
       if ((storedToken || storedAdminToken) && storedUser) {
         const userData = JSON.parse(storedUser) as User;
         setUser(userData);
         setIsLoggedIn(true);
         setIsAdmin(userData.is_admin);
+        console.log('AuthContext: user authenticated as', 
+                   userData.is_admin ? 'admin' : 'user');
       } else {
         setUser(null);
         setIsLoggedIn(false);
         setIsAdmin(false);
+        console.log('AuthContext: no authenticated user');
       }
     } catch (error) {
       console.error('Error checking authentication state:', error);

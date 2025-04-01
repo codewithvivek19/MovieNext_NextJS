@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { verifyPassword, generateToken } from '@/lib/auth';
+import { verifyPassword, simpleVerifyPassword, generateToken } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // No caching
 
@@ -49,8 +49,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify password
-    const isValidPassword = verifyPassword(password, user.password);
+    // Verify password with properly awaited async function
+    let isValidPassword = false;
+    
+    try {
+      // Try bcrypt comparison first (async)
+      isValidPassword = await verifyPassword(password, user.password);
+    } catch (error) {
+      // If bcrypt fails, try simple verification
+      isValidPassword = simpleVerifyPassword(password, user.password);
+    }
 
     if (!isValidPassword) {
       return NextResponse.json(
@@ -98,6 +106,18 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+    
+    // Provide more specific error messages based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return NextResponse.json(
+          { error: 'Database error during login. Please try again later.' },
+          { status: 500 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Something went wrong during login. Please try again.' },
       { status: 500 }

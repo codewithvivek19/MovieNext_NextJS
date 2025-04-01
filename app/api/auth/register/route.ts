@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash password
-    const hashedPassword = hashPassword(password);
+    // Hash password - Note: hashPassword is now async
+    const hashedPassword = await hashPassword(password);
 
     // Create new user with validated data
     const newUser = await prisma.user.create({
@@ -96,6 +96,18 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+    
+    // Provide more specific error messages based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return NextResponse.json(
+          { error: 'Database error during registration. Please try again later.' },
+          { status: 500 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Something went wrong during registration. Please try again.' },
       { status: 500 }

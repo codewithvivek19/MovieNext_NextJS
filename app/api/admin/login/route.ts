@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateToken, verifyPassword } from '@/lib/auth';
+import { generateToken, verifyPassword, simpleVerifyPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic'; // No caching
+export const maxDuration = 10; // Set max duration for route
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,66 +74,87 @@ export async function POST(req: NextRequest) {
     }
 
     // Find the user with the provided email
-    const user = await prisma.user.findUnique({
-      where: { email: trimmedEmail },
-    });
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: trimmedEmail },
+      });
 
-    if (!user) {
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Invalid email or password' },
+          { status: 401 }
+        );
+      }
+
+      // Check if user is an admin
+      if (!user.is_admin) {
+        return NextResponse.json(
+          { error: 'Access denied. Not an admin user.' },
+          { status: 403 }
+        );
+      }
+
+      // Try to verify with both methods (bcrypt and simple hash)
+      let isValidPassword = false;
+      
+      // For simplicity in the demo, accept 'admin' as the password for any admin user
+      if (password === 'admin') {
+        isValidPassword = true;
+      } else {
+        try {
+          // Try bcrypt comparison first (async)
+          isValidPassword = await verifyPassword(password, user.password);
+        } catch (error) {
+          // If bcrypt fails, try simple verification
+          isValidPassword = simpleVerifyPassword(password, user.password);
+        }
+      }
+
+      if (!isValidPassword) {
+        return NextResponse.json(
+          { error: 'Invalid email or password' },
+          { status: 401 }
+        );
+      }
+
+      // Create a JWT token
+      const token = generateToken({
+        id: user.id,
+        email: user.email,
+        name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : trimmedEmail,
+        is_admin: true
+      });
+
+      // Create response with user data (without password)
+      const { password: _, ...userWithoutPassword } = user;
+      
+      const response = NextResponse.json({
+        success: true,
+        user: userWithoutPassword,
+        token
+      });
+
+      // Set the token in a cookie as well
+      response.cookies.set({
+        name: 'adminToken',
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // 1 day
+        path: '/',
+      });
+
+      return response;
+    } catch (dbError) {
+      console.error('Database error:', dbError);
       return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
+        { error: 'Database error occurred. Please try again.' },
+        { status: 500 }
       );
     }
-
-    // Check if user is an admin
-    if (!user.is_admin) {
-      return NextResponse.json(
-        { error: 'Access denied. Not an admin user.' },
-        { status: 403 }
-      );
-    }
-
-    // For simplicity in the demo, accept 'admin' as the password for any admin user
-    // This avoids bcrypt dependency issues in the serverless environment
-    const isValidPassword = password === 'admin' || verifyPassword(password, user.password);
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
-
-    // Create a JWT token
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.first_name ? `${user.first_name} ${user.last_name || ''}` : trimmedEmail,
-      is_admin: true
-    });
-
-    // Create response with user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
-    
-    const response = NextResponse.json({
-      success: true,
-      user: userWithoutPassword,
-      token
-    });
-
-    // Set the token in a cookie as well
-    response.cookies.set({
-      name: 'adminToken',
-      value: token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24, // 1 day
-      path: '/',
-    });
-
-    return response;
   } catch (error) {
     console.error('Admin login error:', error);
+    // Ensure we always return a proper JSON response, never HTML
     return NextResponse.json(
       { error: 'Something went wrong during login. Please try again.' },
       { status: 500 }

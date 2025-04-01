@@ -60,21 +60,31 @@ export default function SignUpPage() {
         body: JSON.stringify(values),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Something went wrong")
+      // Check for empty responses and handle them gracefully
+      if (!response.body) {
+        throw new Error("Server returned an empty response");
       }
 
-      // Store token and user data in auth context
-      login(data.token, data.user)
-      
-      // Registration successful - show success message and redirect to home
-      toast.success("Account created successfully!")
-      router.push("/")
+      try {
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Registration failed. Please try again.");
+        }
+
+        // Store token and user data in auth context
+        login(data.token, data.user);
+        
+        // Registration successful - show success message and redirect to home
+        toast.success("Account created successfully!");
+        router.push("/");
+      } catch (jsonError) {
+        console.error("Error parsing response:", jsonError);
+        throw new Error("Failed to process server response. Please try again.");
+      }
     } catch (error: any) {
-      console.error("Registration error:", error)
-      toast.error(error.message || "Registration failed")
+      console.error("Registration error:", error);
+      toast.error(error.message || "Registration failed");
     } finally {
       setIsLoading(false)
     }

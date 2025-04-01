@@ -170,4 +170,36 @@ export function parseMovieData(movie: Movie): Movie {
     genres: typeof movie.genres === 'string' ? JSON.parse(movie.genres as string) : movie.genres,
     cast: typeof movie.cast === 'string' ? JSON.parse(movie.cast as string) : movie.cast
   };
+}
+
+// Helper function to make authenticated API requests
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  try {
+    // Add default headers for JSON requests
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    
+    // Make the request with credentials to include cookies
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include', // Include cookies with the request
+    });
+    
+    // Handle unauthorized errors
+    if (response.status === 401) {
+      // Redirect to sign-in page if needed
+      if (typeof window !== 'undefined') {
+        window.location.href = `/sign-in?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+      }
+      throw new Error('Unauthorized');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error(`Error fetching ${url}:`, error);
+    throw error;
+  }
 } 

@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChevronRight, Film, MapPin, CalendarDays, Clock, Ticket, Users, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { fetchWithAuth } from "@/lib/api-client"
 
 interface Booking {
   id: number
@@ -49,14 +50,9 @@ export default function MyBookingsPage() {
     async function fetchBookings() {
       try {
         setLoading(true)
-        const response = await fetch("/api/bookings")
+        const response = await fetchWithAuth("/api/bookings")
         
         if (!response.ok) {
-          if (response.status === 401) {
-            // Not authenticated
-            router.push("/sign-in?returnUrl=/my-bookings")
-            return
-          }
           throw new Error("Failed to fetch bookings")
         }
         
@@ -190,13 +186,33 @@ function BookingCard({
   onViewTicket: (reference: string) => void,
   isPast?: boolean
 }) {
-  const seats = typeof booking.seats === 'string' ? JSON.parse(booking.seats) : booking.seats
+  // Safely parse seats, ensuring it's always an array
+  const seats = (() => {
+    try {
+      if (typeof booking.seats === 'string') {
+        const parsed = JSON.parse(booking.seats);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return Array.isArray(booking.seats) ? booking.seats : [];
+    } catch (e) {
+      console.error("Error parsing seats data:", e);
+      return [];
+    }
+  })();
   
   const statusColor = {
     CONFIRMED: "bg-green-500",
     PENDING: "bg-yellow-500",
     CANCELLED: "bg-red-500"
   }[booking.status]
+  
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "MMMM dd, yyyy")
+    } catch (e) {
+      return dateString
+    }
+  }
   
   return (
     <Card>

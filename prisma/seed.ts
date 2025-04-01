@@ -16,10 +16,8 @@ async function main() {
       first_name: 'Admin',
       last_name: 'User',
       is_admin: true,
-      // Storing password field for possible future use
-      // Note: The password field doesn't exist in the schema,
-      // but we're keeping this code for reference in case you add it later
-      // password: adminPassword
+      password: adminPassword,
+      role: 'ADMIN'
     },
   });
 

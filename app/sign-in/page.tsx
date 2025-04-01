@@ -52,21 +52,34 @@ export default function SignInPage() {
         body: JSON.stringify(values),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Invalid email or password")
+      // Check for empty responses and handle them gracefully
+      if (!response.body) {
+        throw new Error("Server returned an empty response");
       }
 
-      // Store token and user data in auth context
-      login(data.token, data.user)
-      
-      // Redirect to home page or last intended destination
-      const returnUrl = new URLSearchParams(window.location.search).get('returnUrl')
-      router.push(returnUrl || "/")
+      try {
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Invalid email or password");
+        }
+
+        // Store token and user data in auth context
+        login(data.token, data.user);
+        
+        // Show success message
+        toast.success("Signed in successfully!");
+        
+        // Redirect to home page or last intended destination
+        const returnUrl = new URLSearchParams(window.location.search).get('returnUrl');
+        router.push(returnUrl || "/");
+      } catch (jsonError) {
+        console.error("Error parsing response:", jsonError);
+        throw new Error("Failed to process server response. Please try again.");
+      }
     } catch (error: any) {
-      console.error("Login error:", error)
-      toast.error(error.message || "Failed to sign in")
+      console.error("Login error:", error);
+      toast.error(error.message || "Failed to sign in");
     } finally {
       setIsLoading(false)
     }
