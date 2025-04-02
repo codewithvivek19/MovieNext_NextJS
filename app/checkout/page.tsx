@@ -319,20 +319,20 @@ export default function CheckoutPage() {
                 ).map(([type, count]: [string, any]) => (
                   <div key={type} className="flex justify-between text-sm">
                     <span>
-                      {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × $
+                      {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ₹
                       {type === "standard" ? 10 : type === "premium" ? 15 : 20})
                     </span>
-                    <span>${count * (type === "standard" ? 10 : type === "premium" ? 15 : 20)}</span>
+                    <span>₹{count * (type === "standard" ? 10 : type === "premium" ? 15 : 20)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between text-sm">
                   <span>Booking Fee</span>
-                  <span>$2</span>
+                  <span>₹2</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>${bookingDetails.total + 2}</span>
+                  <span>₹{bookingDetails.total + 2}</span>
                 </div>
               </div>
             </CardContent>
@@ -345,7 +345,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <>
-                    Pay ${bookingDetails.total + 2}
+                    Pay ₹{bookingDetails.total + 2}
                     <CheckCircle2 size={16} className="ml-2" />
                   </>
                 )}

@@ -281,7 +281,7 @@ function BookingCard({
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="font-semibold">${booking.total_price.toFixed(2)}</p>
+                <p className="font-semibold">₹{booking.total_price.toFixed(2)}</p>
               </div>
               <Button
                 onClick={() => onViewTicket(booking.booking_reference)}

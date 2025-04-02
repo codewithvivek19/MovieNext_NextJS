@@ -161,7 +161,7 @@ export function QRTicket({ bookingData }: TicketProps) {
     doc.text(`Theater: ${bookingData.showtime.theater.name}`, 20, 60)
     doc.text(`Location: ${bookingData.showtime.theater.location}`, 20, 66)
     doc.text(`Seats: ${formatSeats()}`, 20, 72)
-    doc.text(`Amount Paid: $${bookingData.total_price.toFixed(2)}`, 20, 78)
+    doc.text(`Amount Paid: ₹${bookingData.total_price.toFixed(2)}`, 20, 78)
 
     // Add QR code
     if (qrCodeUrl) {
@@ -246,7 +246,7 @@ export function QRTicket({ bookingData }: TicketProps) {
             <div className="border-t border-dashed pt-3 mt-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Amount Paid:</span>
-                <span className="font-medium">${bookingData.total_price.toFixed(2)}</span>
+                <span className="font-medium">₹{bookingData.total_price.toFixed(2)}</span>
               </div>
             </div>
           </div>
