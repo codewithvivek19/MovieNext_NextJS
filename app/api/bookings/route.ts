@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticatedMiddleware } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { FIXED_SHOWTIMES, generateShowtimeId } from '@/app/constants/showtimes';
 
 export const dynamic = 'force-dynamic'; // No caching
 
@@ -17,15 +18,16 @@ export async function POST(req: NextRequest) {
     // Parse request body
     const {
       showtimeId,
+      showtimeData,
       seats,
       totalPrice,
       paymentMethod
     } = await req.json();
 
     // Validate required fields
-    if (!showtimeId || !seats || !totalPrice) {
+    if (!seats || !totalPrice) {
       return NextResponse.json(
-        { error: 'Showtime, seats, and total price are required' },
+        { error: 'Seats and total price are required' },
         { status: 400 }
       );
     }
@@ -38,26 +40,122 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify that the showtime exists before trying to book
-    const showtime = await prisma.showtime.findUnique({
-      where: { id: parseInt(showtimeId) },
-      include: {
-        movie: true,
-        theater: true
+    // Handle showtime - either find existing or create on-the-fly
+    let showtime;
+    let showtimeIdToUse = showtimeId;
+
+    // If showtimeData is provided, we'll use it to find or create the showtime
+    if (showtimeData) {
+      const { movieId, theaterId, date, time, format, price } = showtimeData;
+      
+      if (!movieId || !theaterId || !date || !time) {
+        return NextResponse.json(
+          { error: 'Incomplete showtime data provided', code: 'INVALID_SHOWTIME_DATA' },
+          { status: 400 }
+        );
       }
-    });
 
-    if (!showtime) {
-      return NextResponse.json(
-        { error: 'The selected showtime does not exist', code: 'SHOWTIME_NOT_FOUND' },
-        { status: 404 }
-      );
-    }
+      // First verify that the movie and theater exist
+      const movie = await prisma.movie.findUnique({
+        where: { id: parseInt(movieId) }
+      });
 
-    // Verify that the movie and theater exist in the showtime
-    if (!showtime.movie || !showtime.theater) {
+      const theater = await prisma.theater.findUnique({
+        where: { id: parseInt(theaterId) }
+      });
+
+      if (!movie) {
+        return NextResponse.json(
+          { error: 'The selected movie does not exist', code: 'MOVIE_NOT_FOUND' },
+          { status: 404 }
+        );
+      }
+
+      if (!theater) {
+        return NextResponse.json(
+          { error: 'The selected theater does not exist', code: 'THEATER_NOT_FOUND' },
+          { status: 404 }
+        );
+      }
+
+      // Generate deterministic ID if not provided
+      if (!showtimeIdToUse) {
+        showtimeIdToUse = generateShowtimeId(movieId, theaterId, date, time);
+      }
+
+      // Try to find an existing showtime first
+      const existingShowtime = await prisma.showtime.findFirst({
+        where: {
+          OR: [
+            { id: parseInt(showtimeIdToUse) },
+            {
+              movieId: parseInt(movieId),
+              theaterId: parseInt(theaterId),
+              date: new Date(date),
+              time
+            }
+          ]
+        }
+      });
+
+      if (existingShowtime) {
+        showtime = existingShowtime;
+        showtimeIdToUse = existingShowtime.id;
+      } else {
+        // No existing showtime, create one
+        // Find the matching fixed showtime format
+        const fixedShowtime = FIXED_SHOWTIMES.find(st => st.time === time);
+        const formatToUse = format || (fixedShowtime ? fixedShowtime.format : 'standard');
+        const priceToUse = price || (fixedShowtime ? fixedShowtime.price : 150);
+        
+        try {
+          showtime = await prisma.showtime.create({
+            data: {
+              id: parseInt(showtimeIdToUse),
+              movieId: parseInt(movieId),
+              theaterId: parseInt(theaterId),
+              date: new Date(date),
+              time: time,
+              format: formatToUse,
+              price: priceToUse,
+              available_seats: theater.seating_capacity - seats.length
+            }
+          });
+        } catch (createError) {
+          console.error('Error creating showtime:', createError);
+          // If showtime already exists (race condition), try to fetch it again
+          showtime = await prisma.showtime.findUnique({
+            where: { id: parseInt(showtimeIdToUse) }
+          });
+          
+          if (!showtime) {
+            return NextResponse.json(
+              { error: 'Failed to create showtime', code: 'SHOWTIME_CREATE_ERROR' },
+              { status: 500 }
+            );
+          }
+        }
+      }
+    } else if (showtimeIdToUse) {
+      // If only showtimeId is provided, try to find the showtime
+      showtime = await prisma.showtime.findUnique({
+        where: { id: parseInt(showtimeIdToUse) },
+        include: {
+          movie: true,
+          theater: true
+        }
+      });
+
+      if (!showtime) {
+        return NextResponse.json(
+          { error: 'The selected showtime does not exist', code: 'SHOWTIME_NOT_FOUND' },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Neither showtimeId nor showtime data provided
       return NextResponse.json(
-        { error: 'The showtime has incomplete data (missing movie or theater)', code: 'INVALID_SHOWTIME_DATA' },
+        { error: 'Either showtime ID or showtime data must be provided', code: 'MISSING_SHOWTIME_INFO' },
         { status: 400 }
       );
     }
@@ -73,7 +171,7 @@ export async function POST(req: NextRequest) {
             connect: { id: userId }
           },
           showtime: {
-            connect: { id: parseInt(showtimeId) }
+            connect: { id: parseInt(showtimeIdToUse) }
           },
           seats: JSON.stringify(seats),
           total_price: totalPrice,
@@ -101,7 +199,7 @@ export async function POST(req: NextRequest) {
 
       // Update available seats for the showtime
       await prisma.showtime.update({
-        where: { id: parseInt(showtimeId) },
+        where: { id: parseInt(showtimeIdToUse) },
         data: {
           available_seats: Math.max(0, showtime.available_seats - seats.length)
         }

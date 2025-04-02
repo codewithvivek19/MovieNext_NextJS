@@ -7,14 +7,8 @@ import { Clock, Calendar, MapPin, Film, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { getMovieById, getTheaterById } from "@/lib/api-client"
 import { toast } from "sonner"
-
-const SEAT_PRICE = {
-  standard: 150,
-  premium: 180,
-  vip: 220,
-}
+import { FIXED_SHOWTIMES, SEAT_PRICES, generateShowtimeId } from "@/app/constants/showtimes"
 
 type SeatType = "standard" | "premium" | "vip"
 
@@ -34,6 +28,7 @@ export default function BookingPage() {
   const theaterId = searchParams.get("theater")
   const showtimeId = searchParams.get("showtime")
   const selectedDate = searchParams.get("date")
+  const selectedTime = searchParams.get("time")
 
   const [seats, setSeats] = useState<Seat[]>([])
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([])
@@ -42,7 +37,7 @@ export default function BookingPage() {
   const [showtime, setShowtime] = useState(null)
   const [loading, setLoading] = useState(true)
   
-  // Fetch movie, theater and showtime data
+  // Fetch movie and theater data, and construct the showtime
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
@@ -75,21 +70,59 @@ export default function BookingPage() {
             }
           }
           
-          // Fetch showtime with cache busting
-          if (showtimeId) {
-            const fetchedShowtime = await fetch(`/api/public/showtimes/${showtimeId}`, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache' }
-            })
-              .then(res => res.json())
-              .then(data => data.showtime)
-            
-            if (fetchedShowtime) {
-              setShowtime(fetchedShowtime)
+          // If we have movieId, theaterId, and either showtimeId or time, create a showtime
+          if (fetchedMovie && theaterId) {
+            // If showtimeId is provided, try to fetch it, but don't fail if it doesn't exist
+            if (showtimeId) {
+              try {
+                const fetchedShowtime = await fetch(`/api/public/showtimes/${showtimeId}`, {
+                  cache: 'no-store',
+                  headers: { 'Cache-Control': 'no-cache' }
+                })
+                  .then(res => res.json())
+                  .then(data => data.showtime)
+                
+                if (fetchedShowtime) {
+                  setShowtime(fetchedShowtime)
+                  setLoading(false)
+                  return
+                }
+              } catch (e) {
+                console.log("Showtime fetch failed, creating from fixed showtimes")
+              }
             }
+            
+            // Either no showtimeId, or fetch failed - use fixed showtimes
+            const date = selectedDate ? new Date(selectedDate) : new Date()
+            
+            // Find the selected time in FIXED_SHOWTIMES or use the first one
+            const fixedShowtime = selectedTime 
+              ? FIXED_SHOWTIMES.find(st => st.time === selectedTime) || FIXED_SHOWTIMES[0]
+              : FIXED_SHOWTIMES[0]
+            
+            // Generate showtime ID
+            const generatedId = showtimeId ? parseInt(showtimeId) : 
+              generateShowtimeId(movieId, theaterId, date.toISOString(), fixedShowtime.time)
+            
+            // Construct the showtime object
+            const constructedShowtime = {
+              id: generatedId,
+              movieId: parseInt(movieId),
+              theaterId: parseInt(theaterId),
+              date: date.toISOString().split('T')[0],
+              time: fixedShowtime.time,
+              format: fixedShowtime.format,
+              price: fixedShowtime.price,
+              available_seats: fetchedTheater?.seating_capacity || 100,
+              movie: fetchedMovie,
+              theater: fetchedTheater
+            }
+            
+            setShowtime(constructedShowtime)
           }
         } catch (err) {
           console.error("Error fetching data:", err)
+          toast.error("Failed to load booking information. Please try again.")
         } finally {
           setLoading(false)
         }
@@ -97,7 +130,7 @@ export default function BookingPage() {
     }
     
     fetchData()
-  }, [movieId, theaterId, showtimeId])
+  }, [movieId, theaterId, showtimeId, selectedDate, selectedTime])
 
   useEffect(() => {
     // Generate seats
@@ -169,7 +202,7 @@ export default function BookingPage() {
 
   const calculateTotal = () => {
     return selectedSeats.reduce((total, seat) => {
-      return total + SEAT_PRICE[seat.type]
+      return total + SEAT_PRICES[seat.type]
     }, 0)
   }
 
@@ -258,7 +291,7 @@ export default function BookingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
             <div className="flex items-center">
               <div className="h-4 w-4 rounded bg-card border mr-2"></div>
               <span className="text-sm">Standard</span>
@@ -341,15 +374,15 @@ export default function BookingPage() {
               <Separator />
 
               <div className="space-y-2">
-                {Object.keys(SEAT_PRICE).map((type) => {
+                {Object.keys(SEAT_PRICES).map((type) => {
                   const count = selectedSeats.filter((seat) => seat.type === type).length
                   if (count === 0) return null
                   return (
                     <div key={type} className="flex justify-between text-sm">
                       <span>
-                        {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ₹{SEAT_PRICE[type as SeatType]})
+                        {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ₹{SEAT_PRICES[type as SeatType]})
                       </span>
-                      <span>₹{count * SEAT_PRICE[type as SeatType]}</span>
+                      <span>₹{count * SEAT_PRICES[type as SeatType]}</span>
                     </div>
                   )
                 })}

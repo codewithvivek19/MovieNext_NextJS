@@ -46,3 +46,16 @@ npx ts-node -r tsconfig-paths/register --project tsconfig.json prisma/regenerate
 
 # Note: The fixed showtime approach ensures that all movies and theaters have consistent showtimes,
 # which should resolve booking issues with newly added movies and theaters.
+
+# Run the script to ensure all movies have basic showtimes
+# This is the simplest and most reliable fix for showtime booking issues
+npx ts-node -r tsconfig-paths/register --project tsconfig.json prisma/ensure-showtimes.ts
+
+# The script will:
+# 1. Check all movies in the database
+# 2. For movies with no showtimes, create basic showtimes at all theaters
+# 3. Use fixed showtimes (10:00 AM, 1:00 PM, etc.) for all generated records
+# 4. Ensure no showtimes are duplicated
+
+# After running this script, all movies including newly added ones will have bookable showtimes
+# The booking system will also create showtimes on-the-fly if needed

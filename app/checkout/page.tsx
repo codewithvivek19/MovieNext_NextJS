@@ -109,6 +109,74 @@ export default function CheckoutPage() {
     }
   }
 
+  const handleBookNow = async () => {
+    setLoading(true)
+    try {
+      // Access the booking details from session storage
+      const storedDetails = sessionStorage.getItem("bookingDetails")
+      if (!storedDetails) {
+        toast.error("Booking details not found. Please try again.")
+        return;
+      }
+
+      const bookingDetails = JSON.parse(storedDetails)
+      const { movie, theater, showtime, seats } = bookingDetails
+
+      // Get the selected seats from booking details
+      const selectedSeats = seats.map((seat: any) => seat.id)
+
+      // Calculate total price
+      const totalPrice = calculateTotal(seats)
+
+      // Create payload for API
+      const payload = {
+        showtimeId: showtime.id,
+        // Include complete showtime data to ensure it exists
+        showtimeData: {
+          movieId: movie.id,
+          theaterId: theater.id,
+          date: showtime.date,
+          time: showtime.time,
+          format: showtime.format,
+          price: showtime.price
+        },
+        seats: selectedSeats,
+        totalPrice: totalPrice,
+        paymentMethod: paymentMethod
+      }
+
+      // Make API request
+      const response = await fetchWithAuth("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create booking")
+      }
+
+      const data = await response.json()
+      
+      // Store booking reference for the confirmation page
+      sessionStorage.setItem("bookingReference", data.booking.booking_reference)
+      
+      // Navigate to confirmation page
+      router.push("/booking-confirmation")
+      
+      // Clear booking details from session storage
+      sessionStorage.removeItem("bookingDetails")
+    } catch (error) {
+      console.error("Error creating booking:", error)
+      toast.error(error instanceof Error ? error.message : "An error occurred while processing your booking")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!bookingDetails || !bookingDetails.movie || !bookingDetails.theater || !bookingDetails.showtime) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
@@ -337,7 +405,7 @@ export default function CheckoutPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button onClick={handlePayment} disabled={loading} className="w-full" size="lg">
+              <Button onClick={handleBookNow} disabled={loading} className="w-full" size="lg">
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
