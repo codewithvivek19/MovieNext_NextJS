@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 function AdminDashboardCards() {
   return (
@@ -126,4 +126,4 @@ export default function AdminDashboard() {
       <AdminQuickStats />
     </div>
   );
-} 
+}

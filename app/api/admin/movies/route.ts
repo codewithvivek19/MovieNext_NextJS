@@ -66,17 +66,40 @@ export async function POST(req: NextRequest) {
       }
     });
     
+    console.log(`Created new movie: "${movie.title}" (ID: ${movie.id})`);
+    
     // Generate showtimes for the new movie
+    let showtimeSuccess = false;
+    let showtimeError = null;
+    
     try {
-      // Generate showtimes for the next 14 days across all theaters
-      await generateShowtimesForMovie(movie.id, 14);
-      console.log(`Generated showtimes for movie: ${movie.title} (ID: ${movie.id})`);
-    } catch (showtimeError) {
-      console.error('Error generating showtimes:', showtimeError);
-      // Continue with response - don't fail the movie creation if showtimes fail
+      console.log(`Generating showtimes for new movie: "${movie.title}" (ID: ${movie.id})`);
+      showtimeSuccess = await generateShowtimesForMovie(movie.id, 14);
+      
+      if (showtimeSuccess) {
+        console.log(`Successfully generated showtimes for movie: "${movie.title}" (ID: ${movie.id})`);
+      } else {
+        console.warn(`Failed to generate showtimes for movie: "${movie.title}" (ID: ${movie.id})`);
+      }
+    } catch (error) {
+      console.error(`Error generating showtimes for movie: "${movie.title}" (ID: ${movie.id})`, error);
+      showtimeError = error instanceof Error ? error.message : 'Unknown error';
     }
     
-    return NextResponse.json({ movie }, { status: 201 });
+    // Return appropriate response based on showtime generation result
+    if (showtimeSuccess) {
+      return NextResponse.json({ 
+        movie,
+        showtimes_generated: true 
+      }, { status: 201 });
+    } else {
+      return NextResponse.json({ 
+        movie, 
+        showtimes_generated: false,
+        showtime_error: showtimeError,
+        message: "Movie created successfully but showtime generation failed. Please use the 'Regenerate Showtimes' feature in the admin dashboard."
+      }, { status: 201 });
+    }
   } catch (error) {
     console.error('Error creating movie:', error);
     return NextResponse.json(
