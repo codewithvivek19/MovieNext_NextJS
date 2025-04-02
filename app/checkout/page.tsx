@@ -12,12 +12,20 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
 import { fetchWithAuth } from "@/lib/api-client"
+import { SEAT_PRICES } from "@/app/constants/showtimes"
 
 export default function CheckoutPage() {
   const router = useRouter()
   const [bookingDetails, setBookingDetails] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState("card")
   const [loading, setLoading] = useState(false)
+
+  // Function to calculate total price based on seat types
+  const calculateTotal = (seats: any[]) => {
+    return seats.reduce((total, seat) => {
+      return total + SEAT_PRICES[seat.type];
+    }, 0);
+  }
 
   useEffect(() => {
     try {
@@ -388,19 +396,19 @@ export default function CheckoutPage() {
                   <div key={type} className="flex justify-between text-sm">
                     <span>
                       {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ₹
-                      {type === "standard" ? 10 : type === "premium" ? 15 : 20})
+                      {SEAT_PRICES[type as keyof typeof SEAT_PRICES]})
                     </span>
-                    <span>₹{count * (type === "standard" ? 10 : type === "premium" ? 15 : 20)}</span>
+                    <span>₹{count * SEAT_PRICES[type as keyof typeof SEAT_PRICES]}</span>
                   </div>
                 ))}
                 <div className="flex justify-between text-sm">
                   <span>Booking Fee</span>
-                  <span>₹2</span>
+                  <span>₹20</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>₹{bookingDetails.total + 2}</span>
+                  <span>₹{bookingDetails.total + 20}</span>
                 </div>
               </div>
             </CardContent>
@@ -413,7 +421,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <>
-                    Pay ₹{bookingDetails.total + 2}
+                    Pay ₹{bookingDetails.total + 20}
                     <CheckCircle2 size={16} className="ml-2" />
                   </>
                 )}
