@@ -38,51 +38,91 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verify that the showtime exists before trying to book
+    const showtime = await prisma.showtime.findUnique({
+      where: { id: parseInt(showtimeId) },
+      include: {
+        movie: true,
+        theater: true
+      }
+    });
+
+    if (!showtime) {
+      return NextResponse.json(
+        { error: 'The selected showtime does not exist', code: 'SHOWTIME_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+
+    // Verify that the movie and theater exist in the showtime
+    if (!showtime.movie || !showtime.theater) {
+      return NextResponse.json(
+        { error: 'The showtime has incomplete data (missing movie or theater)', code: 'INVALID_SHOWTIME_DATA' },
+        { status: 400 }
+      );
+    }
+
     // Generate a unique booking reference
     const bookingReference = uuidv4().substring(0, 8).toUpperCase();
 
     // Create the booking in the database
-    const booking = await prisma.booking.create({
-      data: {
-        user: {
-          connect: { id: userId }
+    try {
+      const booking = await prisma.booking.create({
+        data: {
+          user: {
+            connect: { id: userId }
+          },
+          showtime: {
+            connect: { id: parseInt(showtimeId) }
+          },
+          seats: JSON.stringify(seats),
+          total_price: totalPrice,
+          booking_reference: bookingReference,
+          payment_method: paymentMethod || 'card',
+          status: 'CONFIRMED'
         },
-        showtime: {
-          connect: { id: parseInt(showtimeId) }
-        },
-        seats: JSON.stringify(seats),
-        total_price: totalPrice,
-        booking_reference: bookingReference,
-        payment_method: paymentMethod || 'card',
-        status: 'CONFIRMED'
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true
-          }
-        },
-        showtime: {
-          include: {
-            movie: true,
-            theater: true
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              first_name: true,
+              last_name: true
+            }
+          },
+          showtime: {
+            include: {
+              movie: true,
+              theater: true
+            }
           }
         }
-      }
-    });
+      });
 
-    // Return the created booking
-    return NextResponse.json({ 
-      success: true, 
-      booking 
-    });
+      // Update available seats for the showtime
+      await prisma.showtime.update({
+        where: { id: parseInt(showtimeId) },
+        data: {
+          available_seats: Math.max(0, showtime.available_seats - seats.length)
+        }
+      });
+
+      // Return the created booking
+      return NextResponse.json({ 
+        success: true, 
+        booking 
+      });
+    } catch (dbError) {
+      console.error('Database error creating booking:', dbError);
+      return NextResponse.json(
+        { error: 'Failed to create booking in database', code: 'DB_ERROR' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Booking creation error:', error);
+    console.error('Error creating booking:', error);
     return NextResponse.json(
-      { error: 'Failed to create booking' },
+      { error: 'Failed to process booking', code: 'PROCESSING_ERROR' },
       { status: 500 }
     );
   }

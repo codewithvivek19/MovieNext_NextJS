@@ -64,14 +64,17 @@ export async function generateShowtimesForMovieTheater(
       { format: 'vip', price: 220 }
     ];
     
-    // Define show times
-    const times = ['10:00 AM', '1:30 PM', '5:00 PM', '8:30 PM', '10:30 PM'];
+    // Define show times - ensure consistency with the format used elsewhere in the app
+    // Remove AM/PM to be consistent with database format
+    const times = ['10:00', '13:30', '17:00', '20:30', '22:30'];
     
     // Create dates for the specified number of days
     const dates = [];
     for (let i = 0; i < daysToGenerate; i++) {
       const date = new Date();
       date.setDate(date.getDate() + i);
+      // Store dates as Date objects but ensure they're properly set with zeroed time
+      date.setHours(0, 0, 0, 0);
       dates.push(date);
     }
     
@@ -82,6 +85,15 @@ export async function generateShowtimesForMovieTheater(
     
     if (!theater) {
       throw new Error(`Theater with ID ${theaterId} not found`);
+    }
+
+    // Get movie to verify it exists
+    const movie = await prisma.movie.findUnique({
+      where: { id: movieId }
+    });
+    
+    if (!movie) {
+      throw new Error(`Movie with ID ${movieId} not found`);
     }
     
     const showtimesToCreate = [];
@@ -114,10 +126,28 @@ export async function generateShowtimesForMovieTheater(
     
     // Insert all showtimes in a batch
     if (showtimesToCreate.length > 0) {
-      await prisma.showtime.createMany({
-        data: showtimesToCreate,
-        skipDuplicates: true
-      });
+      try {
+        await prisma.showtime.createMany({
+          data: showtimesToCreate,
+          skipDuplicates: true
+        });
+        console.log(`Created ${showtimesToCreate.length} showtimes for movie ${movieId} at theater ${theaterId}`);
+      } catch (createError) {
+        console.error('Error creating showtimes batch:', createError);
+        // Try creating one by one if batch fails
+        let successCount = 0;
+        for (const showtimeData of showtimesToCreate) {
+          try {
+            await prisma.showtime.create({
+              data: showtimeData
+            });
+            successCount++;
+          } catch (individualError) {
+            console.error('Error creating individual showtime:', individualError);
+          }
+        }
+        console.log(`Created ${successCount}/${showtimesToCreate.length} showtimes individually`);
+      }
     }
     
     return true;
