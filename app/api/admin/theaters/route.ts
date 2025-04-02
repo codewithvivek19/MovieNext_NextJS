@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAdminMiddleware } from '@/lib/auth';
+import { generateShowtimesForTheater } from '@/lib/utils/showtime-generator';
 
 // GET: Get all theaters
 export async function GET(req: NextRequest) {
@@ -62,6 +63,16 @@ export async function POST(req: NextRequest) {
     const theater = await prisma.theater.create({
       data
     });
+    
+    // Generate showtimes for the new theater
+    try {
+      // Generate showtimes for the next 14 days for all movies
+      await generateShowtimesForTheater(theater.id, 14);
+      console.log(`Generated showtimes for theater: ${theater.name} (ID: ${theater.id})`);
+    } catch (showtimeError) {
+      console.error('Error generating showtimes:', showtimeError);
+      // Continue with response - don't fail the theater creation if showtimes fail
+    }
     
     return NextResponse.json({ theater }, { status: 201 });
   } catch (error) {
