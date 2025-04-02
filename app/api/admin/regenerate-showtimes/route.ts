@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAdminMiddleware } from '@/lib/auth';
-import { generateAllShowtimes, generateShowtimesForMovie, generateShowtimesForTheater } from '@/lib/utils/showtime-generator';
+import { generateAllShowtimes, generateShowtimesForMovie, generateShowtimesForTheater, generateShowtimesForMovieTheater } from '@/lib/utils/showtime-generator';
 
 /**
  * POST: Regenerate showtimes
@@ -29,151 +29,140 @@ export async function POST(req: NextRequest) {
     if (!isAdmin) {
       return NextResponse.json({ error }, { status: 401 });
     }
-    
-    // Get the parameters
+
     const data = await req.json();
-    const { movieId, theaterId, daysToGenerate = 14 } = data;
+    const { movieId, theaterId, days = 14 } = data;
     
-    // Option 1: Regenerate for a specific movie
-    if (movieId && !theaterId) {
-      const movie = await prisma.movie.findUnique({
-        where: { id: parseInt(movieId) }
-      });
-      
-      if (!movie) {
-        return NextResponse.json({ error: 'Movie not found' }, { status: 404 });
-      }
-      
-      // Clear existing showtimes for this movie
-      await prisma.showtime.deleteMany({
-        where: { movieId: parseInt(movieId) }
-      });
-      
-      // Generate new showtimes
-      await generateShowtimesForMovie(parseInt(movieId), daysToGenerate);
-      
-      return NextResponse.json({
-        success: true,
-        message: `Showtimes regenerated for movie: ${movie.title}`
-      });
+    // Validate at least one ID is provided
+    if (!movieId && !theaterId) {
+      return NextResponse.json(
+        { error: 'Either movieId or theaterId must be provided' },
+        { status: 400 }
+      );
     }
-    
-    // Option 2: Regenerate for a specific theater
-    if (theaterId && !movieId) {
-      const theater = await prisma.theater.findUnique({
-        where: { id: parseInt(theaterId) }
-      });
-      
-      if (!theater) {
-        return NextResponse.json({ error: 'Theater not found' }, { status: 404 });
-      }
-      
-      // Clear existing showtimes for this theater
-      await prisma.showtime.deleteMany({
-        where: { theaterId: parseInt(theaterId) }
-      });
-      
-      // Generate new showtimes
-      await generateShowtimesForTheater(parseInt(theaterId), daysToGenerate);
-      
-      return NextResponse.json({
-        success: true,
-        message: `Showtimes regenerated for theater: ${theater.name}`
-      });
-    }
-    
-    // Option 3: Regenerate for a specific movie and theater
+
+    // Status for the response
+    let status = {
+      success: false,
+      message: '',
+      details: {}
+    };
+
+    // Case 1: Both movie and theater IDs provided - regenerate for specific combination
     if (movieId && theaterId) {
-      const movie = await prisma.movie.findUnique({
-        where: { id: parseInt(movieId) }
-      });
+      console.log(`Regenerating showtimes for movie ID ${movieId} and theater ID ${theaterId}`);
       
-      const theater = await prisma.theater.findUnique({
-        where: { id: parseInt(theaterId) }
-      });
+      // Verify that both movie and theater exist
+      const movie = await prisma.movie.findUnique({ where: { id: movieId } });
+      const theater = await prisma.theater.findUnique({ where: { id: theaterId } });
       
       if (!movie) {
-        return NextResponse.json({ error: 'Movie not found' }, { status: 404 });
+        return NextResponse.json(
+          { error: `Movie with ID ${movieId} not found` },
+          { status: 404 }
+        );
       }
       
       if (!theater) {
-        return NextResponse.json({ error: 'Theater not found' }, { status: 404 });
+        return NextResponse.json(
+          { error: `Theater with ID ${theaterId} not found` },
+          { status: 404 }
+        );
       }
       
-      // Clear existing showtimes for this movie-theater combination
-      await prisma.showtime.deleteMany({
-        where: {
-          movieId: parseInt(movieId),
-          theaterId: parseInt(theaterId)
-        }
-      });
-      
-      // Generate new showtimes for just this combination
-      await prisma.$transaction(async (prisma) => {
-        const formats = [
-          { format: 'standard', price: 150 },
-          { format: 'premium', price: 180 },
-          { format: 'imax', price: 200 },
-          { format: 'vip', price: 220 }
-        ];
-        
-        const times = ['10:00 AM', '1:30 PM', '5:00 PM', '8:30 PM', '10:30 PM'];
-        const showtimesToCreate = [];
-        
-        // Create dates for the specified number of days
-        for (let i = 0; i < daysToGenerate; i++) {
-          const date = new Date();
-          date.setDate(date.getDate() + i);
-          
-          // Choose 2-3 times for each day
-          const numShowtimes = 2 + Math.floor(Math.random() * 2);
-          const shuffledTimes = [...times].sort(() => 0.5 - Math.random());
-          const selectedTimes = shuffledTimes.slice(0, numShowtimes);
-          
-          for (const time of selectedTimes) {
-            const formatIndex = Math.floor(Math.random() * formats.length);
-            const { format, price } = formats[formatIndex];
-            
-            showtimesToCreate.push({
-              movieId: parseInt(movieId),
-              theaterId: parseInt(theaterId),
-              date,
-              time,
-              format,
-              price,
-              available_seats: theater.seating_capacity
-            });
-          }
-        }
-        
-        if (showtimesToCreate.length > 0) {
-          await prisma.showtime.createMany({
-            data: showtimesToCreate
-          });
-        }
-      });
-      
-      return NextResponse.json({
-        success: true,
-        message: `Showtimes regenerated for ${movie.title} at ${theater.name}`
-      });
+      try {
+        const result = await generateShowtimesForMovieTheater(movieId, theaterId, days);
+        status.success = true;
+        status.message = `Successfully regenerated showtimes for movie "${movie.title}" at theater "${theater.name}"`;
+        status.details = { 
+          movie: { id: movieId, title: movie.title },
+          theater: { id: theaterId, name: theater.name },
+          days: days,
+          result
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { 
+            error: 'Failed to regenerate showtimes for movie-theater combination',
+            message: error instanceof Error ? error.message : 'Unknown error'
+          },
+          { status: 500 }
+        );
+      }
     }
-    
-    // Option 4: Regenerate for all movies and theaters
-    // First clear all existing showtimes
-    await prisma.showtime.deleteMany({});
-    
-    // Then generate new ones
-    await generateAllShowtimes(daysToGenerate);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'All showtimes regenerated successfully'
-    });
+    // Case 2: Only movie ID provided - regenerate for all theaters
+    else if (movieId) {
+      console.log(`Regenerating showtimes for movie ID ${movieId} across all theaters`);
+      
+      const movie = await prisma.movie.findUnique({ where: { id: movieId } });
+      
+      if (!movie) {
+        return NextResponse.json(
+          { error: `Movie with ID ${movieId} not found` },
+          { status: 404 }
+        );
+      }
+      
+      try {
+        const result = await generateShowtimesForMovie(movieId, days);
+        status.success = true;
+        status.message = `Successfully regenerated showtimes for movie "${movie.title}" across all theaters`;
+        status.details = { 
+          movie: { id: movieId, title: movie.title }, 
+          days: days,
+          result
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { 
+            error: 'Failed to regenerate showtimes for movie',
+            message: error instanceof Error ? error.message : 'Unknown error' 
+          },
+          { status: 500 }
+        );
+      }
+    }
+    // Case 3: Only theater ID provided - regenerate for all movies
+    else if (theaterId) {
+      console.log(`Regenerating showtimes for theater ID ${theaterId} for all movies`);
+      
+      const theater = await prisma.theater.findUnique({ where: { id: theaterId } });
+      
+      if (!theater) {
+        return NextResponse.json(
+          { error: `Theater with ID ${theaterId} not found` },
+          { status: 404 }
+        );
+      }
+      
+      try {
+        const result = await generateShowtimesForTheater(theaterId, days);
+        status.success = true;
+        status.message = `Successfully regenerated showtimes for theater "${theater.name}" with all movies`;
+        status.details = { 
+          theater: { id: theaterId, name: theater.name }, 
+          days: days,
+          result
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { 
+            error: 'Failed to regenerate showtimes for theater',
+            message: error instanceof Error ? error.message : 'Unknown error'
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json(status);
   } catch (error) {
-    console.error('Error regenerating showtimes:', error);
+    console.error('Error in regenerate-showtimes API:', error);
     return NextResponse.json(
-      { error: 'Failed to regenerate showtimes' },
+      { 
+        error: 'Internal server error during showtime regeneration',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
