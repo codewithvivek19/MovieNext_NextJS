@@ -59,9 +59,9 @@ export async function generateShowtimesForMovieTheater(
     // Define show formats and prices
     const formats = [
       { format: 'standard', price: 150 },
-      { format: 'premium', price: 250 },
-      { format: 'imax', price: 350 },
-      { format: 'vip', price: 450 }
+      { format: 'premium', price: 180 },
+      { format: 'imax', price: 200 },
+      { format: 'vip', price: 220 }
     ];
     
     // Define show times

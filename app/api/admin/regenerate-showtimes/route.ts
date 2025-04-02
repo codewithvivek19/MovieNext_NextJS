@@ -112,9 +112,9 @@ export async function POST(req: NextRequest) {
       await prisma.$transaction(async (prisma) => {
         const formats = [
           { format: 'standard', price: 150 },
-          { format: 'premium', price: 250 },
-          { format: 'imax', price: 350 },
-          { format: 'vip', price: 450 }
+          { format: 'premium', price: 180 },
+          { format: 'imax', price: 200 },
+          { format: 'vip', price: 220 }
         ];
         
         const times = ['10:00 AM', '1:30 PM', '5:00 PM', '8:30 PM', '10:30 PM'];

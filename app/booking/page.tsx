@@ -11,9 +11,9 @@ import { getMovieById, getTheaterById } from "@/lib/api-client"
 import { toast } from "sonner"
 
 const SEAT_PRICE = {
-  standard: 10,
-  premium: 15,
-  vip: 20,
+  standard: 150,
+  premium: 180,
+  vip: 220,
 }
 
 type SeatType = "standard" | "premium" | "vip"
@@ -347,20 +347,20 @@ export default function BookingPage() {
                   return (
                     <div key={type} className="flex justify-between text-sm">
                       <span>
-                        {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ${SEAT_PRICE[type as SeatType]})
+                        {type.charAt(0).toUpperCase() + type.slice(1)} ({count} × ₹{SEAT_PRICE[type as SeatType]})
                       </span>
-                      <span>${count * SEAT_PRICE[type as SeatType]}</span>
+                      <span>₹{count * SEAT_PRICE[type as SeatType]}</span>
                     </div>
                   )
                 })}
                 <div className="flex justify-between text-sm">
                   <span>Booking Fee</span>
-                  <span>${selectedSeats.length > 0 ? 2 : 0}</span>
+                  <span>₹{selectedSeats.length > 0 ? 20 : 0}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>${calculateTotal() + (selectedSeats.length > 0 ? 2 : 0)}</span>
+                  <span>₹{calculateTotal() + (selectedSeats.length > 0 ? 20 : 0)}</span>
                 </div>
               </div>
             </CardContent>
