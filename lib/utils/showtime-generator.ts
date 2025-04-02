@@ -1,12 +1,26 @@
 import prisma from '@/lib/prisma';
 
 /**
- * Generate random showtimes for a specific movie at all theaters
+ * Simplified showtime generator that creates the same set of showtimes for all movies and theaters
+ * This removes the complexity of random generation and ensures consistent showtimes
+ */
+
+// Fixed showtime data - the same for all movies and theaters
+const STANDARD_SHOW_TIMES = ['10:00 AM', '1:00 PM', '4:00 PM', '7:00 PM', '10:00 PM'];
+const STANDARD_FORMATS = [
+  { format: 'standard', price: 150 },
+  { format: 'premium', price: 180 },
+  { format: 'imax', price: 200 },
+  { format: 'vip', price: 220 }
+];
+
+/**
+ * Generate fixed showtimes for a specific movie at all theaters
  * @param movieId The ID of the movie
  * @param daysToGenerate Number of days to generate showtimes for
  */
 export async function generateShowtimesForMovie(movieId: number, daysToGenerate: number = 14) {
-  console.log(`Generating showtimes for movie ID ${movieId} across all theaters`);
+  console.log(`Generating fixed showtimes for movie ID ${movieId} across all theaters`);
   try {
     // Verify the movie exists first
     const movie = await prisma.movie.findUnique({
@@ -31,7 +45,7 @@ export async function generateShowtimesForMovie(movieId: number, daysToGenerate:
     let successCount = 0;
     for (const theater of theaters) {
       try {
-        const result = await generateShowtimesForMovieTheater(movieId, theater.id, daysToGenerate);
+        const result = await generateFixedShowtimesForMovieTheater(movieId, theater.id, daysToGenerate);
         if (result) successCount++;
       } catch (error) {
         console.error(`Error generating showtimes for movie ${movieId} at theater ${theater.id}:`, error);
@@ -47,12 +61,12 @@ export async function generateShowtimesForMovie(movieId: number, daysToGenerate:
 }
 
 /**
- * Generate random showtimes for all movies at a specific theater
+ * Generate fixed showtimes for all movies at a specific theater
  * @param theaterId The ID of the theater
  * @param daysToGenerate Number of days to generate showtimes for
  */
 export async function generateShowtimesForTheater(theaterId: number, daysToGenerate: number = 14) {
-  console.log(`Generating showtimes for theater ID ${theaterId} for all movies`);
+  console.log(`Generating fixed showtimes for theater ID ${theaterId} for all movies`);
   try {
     // Verify the theater exists first
     const theater = await prisma.theater.findUnique({
@@ -77,7 +91,7 @@ export async function generateShowtimesForTheater(theaterId: number, daysToGener
     let successCount = 0;
     for (const movie of movies) {
       try {
-        const result = await generateShowtimesForMovieTheater(movie.id, theaterId, daysToGenerate);
+        const result = await generateFixedShowtimesForMovieTheater(movie.id, theaterId, daysToGenerate);
         if (result) successCount++;
       } catch (error) {
         console.error(`Error generating showtimes for movie ${movie.id} at theater ${theaterId}:`, error);
@@ -93,30 +107,19 @@ export async function generateShowtimesForTheater(theaterId: number, daysToGener
 }
 
 /**
- * Generate random showtimes for a specific movie at a specific theater
+ * Generate fixed showtimes for a specific movie at a specific theater
  * @param movieId The ID of the movie
  * @param theaterId The ID of the theater
  * @param daysToGenerate Number of days to generate showtimes for
  */
-export async function generateShowtimesForMovieTheater(
+export async function generateFixedShowtimesForMovieTheater(
   movieId: number, 
   theaterId: number, 
   daysToGenerate: number = 14
 ) {
-  console.log(`Generating showtimes for movie ${movieId} at theater ${theaterId}`);
+  console.log(`Generating fixed showtimes for movie ${movieId} at theater ${theaterId}`);
   
   try {
-    // Define show formats and prices
-    const formats = [
-      { format: 'standard', price: 150 },
-      { format: 'premium', price: 180 },
-      { format: 'imax', price: 200 },
-      { format: 'vip', price: 220 }
-    ];
-    
-    // Define show times in 12-hour format to ensure consistency
-    const times = ['10:00 AM', '1:30 PM', '5:00 PM', '8:30 PM', '10:30 PM'];
-    
     // Create dates for the specified number of days
     const dates = [];
     for (let i = 0; i < daysToGenerate; i++) {
@@ -162,30 +165,63 @@ export async function generateShowtimesForMovieTheater(
     
     const showtimesToCreate = [];
     
-    // For each date, create 2-3 showtimes with random formats
+    // Create fixed showtimes for all dates
     for (const date of dates) {
-      // Choose a random number of showtimes per day (2-3)
-      const numShowtimes = 2 + Math.floor(Math.random() * 2);
+      // For each date, create showtimes with all standard times and formats
       
-      // Choose random times without duplicates
-      const shuffledTimes = [...times].sort(() => 0.5 - Math.random());
-      const selectedTimes = shuffledTimes.slice(0, numShowtimes);
+      // For morning and afternoon shows, use standard format
+      showtimesToCreate.push({
+        movieId,
+        theaterId,
+        date,
+        time: STANDARD_SHOW_TIMES[0], // 10:00 AM
+        format: 'standard',
+        price: 150,
+        available_seats: theater.seating_capacity
+      });
       
-      for (const time of selectedTimes) {
-        // Choose a random format
-        const formatIndex = Math.floor(Math.random() * formats.length);
-        const { format, price } = formats[formatIndex];
-        
-        showtimesToCreate.push({
-          movieId,
-          theaterId,
-          date,
-          time,
-          format,
-          price,
-          available_seats: theater.seating_capacity
-        });
-      }
+      showtimesToCreate.push({
+        movieId,
+        theaterId,
+        date,
+        time: STANDARD_SHOW_TIMES[1], // 1:00 PM
+        format: 'standard',
+        price: 150,
+        available_seats: theater.seating_capacity
+      });
+      
+      // For evening shows, use premium format
+      showtimesToCreate.push({
+        movieId,
+        theaterId,
+        date,
+        time: STANDARD_SHOW_TIMES[2], // 4:00 PM
+        format: 'premium',
+        price: 180,
+        available_seats: theater.seating_capacity
+      });
+      
+      // For prime time shows, use IMAX format
+      showtimesToCreate.push({
+        movieId,
+        theaterId,
+        date,
+        time: STANDARD_SHOW_TIMES[3], // 7:00 PM
+        format: 'imax',
+        price: 200,
+        available_seats: theater.seating_capacity
+      });
+      
+      // For night shows, use VIP format
+      showtimesToCreate.push({
+        movieId,
+        theaterId,
+        date,
+        time: STANDARD_SHOW_TIMES[4], // 10:00 PM
+        format: 'vip',
+        price: 220,
+        available_seats: theater.seating_capacity
+      });
     }
     
     console.log(`Prepared ${showtimesToCreate.length} showtimes for creation`);
@@ -199,28 +235,7 @@ export async function generateShowtimesForMovieTheater(
         });
         
         console.log(`Successfully created ${result.count} showtimes for movie ${movieId} at theater ${theaterId}`);
-        
-        // If no showtimes were created despite having showtimes to create, try individual creation
-        if (result.count === 0) {
-          console.log(`Batch creation failed. Trying individual showtime creation...`);
-          let successCount = 0;
-          
-          for (const showtimeData of showtimesToCreate) {
-            try {
-              await prisma.showtime.create({
-                data: showtimeData
-              });
-              successCount++;
-            } catch (individualError) {
-              console.error(`Failed to create individual showtime:`, individualError);
-            }
-          }
-          
-          console.log(`Created ${successCount}/${showtimesToCreate.length} showtimes individually`);
-          return successCount > 0;
-        }
-        
-        return true;
+        return result.count > 0;
       } catch (createError) {
         console.error(`Error creating showtimes batch:`, createError);
         
@@ -242,10 +257,10 @@ export async function generateShowtimesForMovieTheater(
         console.log(`Created ${successCount}/${showtimesToCreate.length} showtimes individually`);
         return successCount > 0;
       }
-    } else {
-      console.log(`No showtimes to create for movie ${movieId} at theater ${theaterId}`);
-      return false;
     }
+    
+    console.log(`No showtimes to create for movie ${movieId} at theater ${theaterId}`);
+    return false;
   } catch (error) {
     console.error(`Error generating showtimes for movie ${movieId} at theater ${theaterId}:`, error);
     return false;
@@ -253,11 +268,11 @@ export async function generateShowtimesForMovieTheater(
 }
 
 /**
- * Generate showtimes for all existing movie-theater combinations
+ * Generate fixed showtimes for all existing movie-theater combinations
  * @param daysToGenerate Number of days to generate showtimes for
  */
 export async function generateAllShowtimes(daysToGenerate: number = 14) {
-  console.log(`Generating showtimes for all movie-theater combinations for ${daysToGenerate} days`);
+  console.log(`Generating fixed showtimes for all movie-theater combinations for ${daysToGenerate} days`);
   try {
     // Get all movies and theaters
     const movies = await prisma.movie.findMany();
@@ -277,7 +292,7 @@ export async function generateAllShowtimes(daysToGenerate: number = 14) {
     for (const movie of movies) {
       for (const theater of theaters) {
         try {
-          const result = await generateShowtimesForMovieTheater(movie.id, theater.id, daysToGenerate);
+          const result = await generateFixedShowtimesForMovieTheater(movie.id, theater.id, daysToGenerate);
           if (result) successCount++;
         } catch (error) {
           console.error(`Error generating showtimes for movie ${movie.id} at theater ${theater.id}:`, error);

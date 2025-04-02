@@ -27,3 +27,22 @@ npx prisma studio
 # Note: For Vercel deployment, make sure to add the migration command to the build script
 # in package.json by updating the build script to:
 # "build": "prisma generate && prisma migrate deploy && next build"
+
+# Prisma Commands for Regenerating Showtimes
+
+# 1. Clear existing showtimes (optional, use with caution as it will remove all showtimes)
+# Run this in a database tool or via Prisma Studio:
+# DELETE FROM "Showtime";
+
+# 2. Generate the Prisma client to ensure it's up to date
+npx prisma generate
+
+# 3. Run the script to generate fixed showtimes for all movie-theater combinations
+# This will use the new fixed showtime format for all movies and theaters
+npx ts-node -r tsconfig-paths/register --project tsconfig.json prisma/regenerate-showtimes.ts
+
+# 4. Alternative: Run the regenerate showtimes API endpoint
+# curl -X POST http://localhost:3000/api/admin/regenerate-showtimes -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+
+# Note: The fixed showtime approach ensures that all movies and theaters have consistent showtimes,
+# which should resolve booking issues with newly added movies and theaters.
