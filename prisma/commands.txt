@@ -1,0 +1,29 @@
+# Prisma Commands for Schema Update and Database Migration
+
+# 1. Create the migration files after updating schema.prisma
+npx prisma migrate dev --name update_showtime_validation
+
+# 2. Apply the migration to the development database
+npx prisma migrate dev
+
+# 3. Generate the updated Prisma client
+npx prisma generate
+
+# 4. Apply migrations to the production database (when ready to deploy)
+npx prisma migrate deploy
+
+# 5. If you need to reset the database and apply all migrations from scratch
+npx prisma migrate reset
+
+# 6. To run the seed file after migrations
+npx prisma db seed
+
+# 7. To verify the schema and database connection
+npx prisma validate
+
+# 8. To check the database schema in a visual interface
+npx prisma studio
+
+# Note: For Vercel deployment, make sure to add the migration command to the build script
+# in package.json by updating the build script to:
+# "build": "prisma generate && prisma migrate deploy && next build"

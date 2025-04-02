@@ -218,32 +218,33 @@ async function main() {
       });
     }
 
-    // Generate sample showtimes
+    // Generate showtimes
     const allMovies = await prisma.movie.findMany();
     const allTheaters = await prisma.theater.findMany();
-    
-    // Define show formats and prices
+
+    // Define show formats and prices with updated price range
     const formats = [
       { format: 'standard', price: 150 },
-      { format: 'premium', price: 250 },
-      { format: 'imax', price: 350 },
-      { format: 'vip', price: 450 }
+      { format: 'premium', price: 180 },
+      { format: 'imax', price: 200 },
+      { format: 'vip', price: 220 }
     ];
-    
-    // Define show times
-    const times = ['10:00', '13:00', '16:00', '19:00', '22:00'];
-    
-    // Create dates for the next 7 days
+
+    // Define show times in 12-hour format
+    const times = ['10:00 AM', '1:00 PM', '4:00 PM', '7:00 PM', '10:00 PM'];
+
+    // Create dates for the next 7 days with zeroed time component
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date();
       date.setDate(date.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      date.setHours(0, 0, 0, 0); // Zero out time component
+      dates.push(date);
     }
-    
+
     // Create showtimes
     const showtimes = [];
-    
+
     for (const theater of allTheaters) {
       for (const movie of allMovies) {
         // Each movie doesn't show in every theater
@@ -278,7 +279,7 @@ async function main() {
         }
       }
     }
-    
+
     // Batch insert showtimes
     await prisma.showtime.createMany({
       data: showtimes,

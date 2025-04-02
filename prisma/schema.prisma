@@ -3,6 +3,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Generate more precise TypeScript types
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -68,9 +70,13 @@ model Showtime {
   movieId         Int       @map("movie_id")
   theater         Theater   @relation(fields: [theaterId], references: [id], onDelete: Cascade)
   theaterId       Int       @map("theater_id")
-  date            DateTime
-  time            String
-  format          String
+  // Store date with time component zeroed out (00:00:00)
+  date            DateTime  
+  // Time format should be consistent: either "HH:MM" (24-hour) or "H:MM AM/PM" (12-hour)
+  time            String    
+  // Format options: "standard", "premium", "imax", "vip"
+  format          String    
+  // Price in INR (whole number)
   price           Int
   available_seats Int       @default(0)
   created_at      DateTime  @default(now())
@@ -79,18 +85,18 @@ model Showtime {
 }
 
 model Booking {
-  id                Int      @id @default(autoincrement())
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId            String   @map("user_id")
-  showtime          Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
-  showtimeId        Int      @map("showtime_id")
-  seats             String // Store as JSON string: ["A1", "A2"]
+  id                Int           @id @default(autoincrement())
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String        @map("user_id")
+  showtime          Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  showtimeId        Int           @map("showtime_id")
+  seats             String        // Store as JSON string: ["A1", "A2"]
   total_price       Int
-  booking_reference String   @unique
-  payment_method    String?
+  booking_reference String        @unique
+  payment_method    String?       // e.g., "card", "upi", "netbanking"
   status            BookingStatus @default(CONFIRMED)
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
 }
 
 enum BookingStatus {
